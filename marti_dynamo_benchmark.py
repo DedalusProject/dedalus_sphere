@@ -394,11 +394,15 @@ def nonlinear(state_vector, RHS, t):
     # get U in coefficient space
     state_vector.unpack(u,p,T,A,pi)
 
+    H.layout = 'c'
     # H = curl(A)
     for ell in range(ell_start,ell_end+1):
         ell_local = ell - ell_start
         B.curl(ell,1,A['c'][ell_local],H['c'][ell_local])
 
+    Du.layout = 'c'
+    DT.layout = 'c'
+    DH.layout = 'c'
     # take derivatives
     for ell in range(ell_start,ell_end+1):
         ell_local = ell - ell_start
@@ -408,14 +412,19 @@ def nonlinear(state_vector, RHS, t):
 
     # R = ez cross u
     ez = np.array([np.cos(theta),-np.sin(theta),0*np.cos(theta)])
+    u_rhs.layout = 'g'
     u_rhs['g'] = -B.cross_grid(ez,u['g'])
     for i in range(3):
         u_rhs['g'][i] -= Rossby*(u['g'][0]*Du['g'][i] + u['g'][1]*Du['g'][3*1+i] + u['g'][2]*Du['g'][3*2+i])
         u_rhs['g'][i] +=        (H['g'][0]*DH['g'][i] + H['g'][1]*DH['g'][3*1+i] + H['g'][2]*DH['g'][3*2+i])
     u_rhs['g'][0] += q*Rayleigh*r*T['g'][0]
+    p_rhs.layout = 'g'
     p_rhs['g'] = 0.
+    T_rhs.layout = 'g'
     T_rhs['g'] = S - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2])
+    A_rhs.layout = 'g'
     A_rhs['g'] = B.cross_grid(u['g'],H['g'])
+    pi_rhs.layout = 'g'
     pi_rhs['g']= 0.
 
     # transform (ell, r) -> (ell, N)
