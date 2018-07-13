@@ -394,7 +394,7 @@ while t < t_end:
     if iter % 10 == 0:
         ur_grid, uth_grid, uph_grid, p_grid, T_grid = backward_state(state_vector)
         if rank == 0:
-            E0 = np.sum(weight_r*weight_theta* 0.5*(np.abs(ur_grid)**2 + np.abs(uth_grid)**2 + np.abs(uph_grid)**2) )*(np.pi)/(L_max+1)
+            E0 = np.sum(weight_r*weight_theta* 0.5*(np.abs(ur_grid)**2 + np.abs(uth_grid)**2 + np.abs(uph_grid)**2) )*(np.pi)/(L_max+1)/L_dealias
             logger.info("iter: {:d}, dt={:e}, t/t_e={:e}, E0={:e}".format(iter, dt, t/t_end,E0))
             t_list.append(t)
             E_list.append(E0)
