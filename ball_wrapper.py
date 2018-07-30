@@ -5,6 +5,8 @@ import sphere_wrapper as sph
 import ball128 as ball
 from dedalus.tools.cache import CachedMethod
 from dedalus.tools.array import reshape_vector
+import clenshaw
+import jacobi128 as jacobi
 import time
 
 from dedalus.tools.config import config
@@ -146,7 +148,14 @@ class Ball:
     @CachedMethod
     def N_min(self,ell):
         return ball.N_min(ell)
-    
+
+    # data is coeff representation of the ncc
+    def ncc_matrix(self, N, k, ell, deg_in, deg_out, data, cutoff=1e-6):
+        q = k + self.a
+        m_in = deg_in  + 1/2
+        m_out= ell + deg_out + 1/2
+        return clenshaw.ncc_matrix(N, q, m_in, q, m_out, data, cutoff=cutoff) /(0.5)**(3/4)
+
     def forward_component(self,ell,deg,data):
         # grid --> coefficients
         N = self.N_max - self.N_min(ell-self.R_max) + 1
