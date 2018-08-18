@@ -15,6 +15,8 @@ STORE_LU_TRANSFORM = config['transforms'].getboolean('STORE_LU_TRANSFORM')
 import logging
 logger = logging.getLogger(__name__)
 
+barrier = False
+timing = False
 
 class Ball:
     def __init__(self,N_max,L_max,R_max=0,a=0,N_r=None,N_theta=None,ell_min=None,ell_max=None,m_min=None,m_max=None):
@@ -78,7 +80,12 @@ class Ball:
             self.LU_grad.append([None]*2)
             self.LU_curl_initialized.append([False]*2)
             self.LU_curl.append([None]*2)
-        
+
+        if timing:
+            self.radial_transform_time = 0.        
+            self.angular_transform_time = 0.
+            self.transpose_time = 0
+
     @CachedMethod
     def grid(self, axis, dimensions=2):
         if axis == 0 and dimensions == 2: grid = self.theta
@@ -117,6 +124,8 @@ class Ball:
 
     def forward_angle(self,m,rank,data_in,data_out):
 
+        if timing: start_time = time.time()
+
         if rank == 0:
             data_out[0,int(self.S.L_min(m,0)):] = self.S.forward_spin(m,0,data_in[0])
             return
@@ -129,21 +138,26 @@ class Ball:
         for i in range(3**rank):
             data_out[i,int(self.S.L_min(m,spins[i])):] = self.S.forward_spin(m,spins[i],data_in[i])
 
-    def backward_angle(self,m,rank,data_in,data_out_shape):
+        if timing:
+            end_time = time.time()
+            self.angular_transform_time += (end_time - start_time)
+
+    def backward_angle(self,m,rank,data_in,data_out):
+
+        if timing: start_time = time.time()
 
         if rank == 0:
             return np.array([self.S.backward_spin(m,0,data_in[0,self.S.L_min(m,0):])])
 
-        spins, unitary = self.spins(rank), self.unitary3D(rank=rank,adjoint=False)
-
-        data_out = np.zeros(data_out_shape,dtype=np.complex128)
+        spins = self.spins(rank)
 
         # This may benefit from some cython. Maybe, maybe not. Keaton?
         for i in range(3**rank):
             data_out[i] = self.S.backward_spin(m,spins[i],data_in[i,int(self.S.L_min(m,spins[i])):])
 
-        data_out = np.einsum("ij,j...->i...",unitary,data_out)
-        return data_out
+        if timing:
+            end_time = time.time()
+            self.angular_transform_time += (end_time - start_time)
 
     @CachedMethod
     def N_min(self,ell):
@@ -175,43 +189,41 @@ class Ball:
             shape[0] = self.N_r
             return np.zeros(shape)
 
-    def radial_forward(self,ell,rank,data_in):
+    def radial_forward(self,ell,rank,data_in,data_out):
+
+        if timing: start_time = time.time()
 
         if rank == 0:
-            return self.forward_component(ell,0,data_in[0])
+            np.copyto(data_out,self.forward_component(ell,0,data_in[0]))
 
         degs = self.spins(rank)
         N = self.N_max - self.N_min(ell-self.R_max) + 1
 
         data_in = np.einsum("ij,j...->i...",self.Q[(ell,rank)].T,data_in) # note transpose
 
-        shape = np.array(data_in.shape[1:])
-        shape[0] = N*(3**rank)
-
-        data_out = np.zeros(shape,np.complex128)
         for i in range(3**rank): # Geoff thinks python can make this faster (??) "VECTORS MAN!" -- Geoff, 2017
             data_out[i*N:(i+1)*N] = self.forward_component(ell,degs[i],data_in[i])
-        return data_out
+        if timing:
+            end_time = time.time()
+            self.radial_transform_time += (end_time - start_time)
 
-    def radial_backward(self,ell,rank,data_in):
+    def radial_backward(self,ell,rank,data_in,data_out):
+
+        if timing: start_time = time.time()
 
         if rank == 0:
-            return np.array([self.backward_component(ell,0,data_in)])
+            data_out[0] = self.backward_component(ell,0,data_in)
+            return
 
         degs = self.spins(rank)
         N =self.N_max - self.N_min(ell-self.R_max) + 1
         
-        shape = np.array(data_in.shape)
-        shape = np.concatenate(([3**rank],shape))
-        shape[1] = self.N_r
-
-        data_out = np.zeros(shape,np.complex128)
-        
         for i in range(3**rank):
             data_out[i] = self.backward_component(ell,degs[i],data_in[i*N:(i+1)*N])
 
-        data_out = np.einsum("ij,j...->i...",self.Q[(ell,rank)],data_out)
-        return data_out
+        if timing:
+            end_time = time.time()
+            self.radial_transform_time += (end_time - start_time)
 
     def unpack(self,ell,rank,data_in):
         N = self.N_max + 1 - self.N_min(ell-self.R_max)
@@ -495,8 +507,9 @@ class TensorField_2D(TensorField):
 
         for ell in range(self.ell_min, self.ell_max + 1):
             ell_local = ell - self.ell_min
-            self.coeff_data[ell_local] = self.B.radial_forward(ell,rank,
-                                                               [self.fields[i].data[ell_local] for i in range(3**rank)])
+            self.B.radial_forward(ell,rank,
+                                  [self.fields[i].data[ell_local] for i in range(3**rank)],
+                                  self.coeff_data[ell_local])
 
         self.data = self.coeff_data
         self._layout = 'c'
@@ -507,14 +520,17 @@ class TensorField_2D(TensorField):
         rank = self.rank
         for ell in range(self.ell_min, self.ell_max + 1):
             ell_local = ell - self.ell_min
-            self.rell_data[:,ell_local,:] = self.B.radial_backward(ell,rank,self.coeff_data[ell_local])
+            self.B.radial_backward(ell,rank,self.coeff_data[ell_local],self.rell_data[:,ell_local,:])
+            self.rell_data[:,ell_local,:] = np.einsum("ij,j...->i...",self.B.Q[(ell,rank)],self.rell_data[:,ell_local,:])
 
         for i, field in enumerate(self.fields):
             field.layout = self.r_ell_layout
             field.data = self.rell_data[i]
             field.require_layout(self.ell_r_layout)
 
-        self.grid_data = self.B.backward_angle(self.m,rank,np.array([self.fields[i].data for i in range(3**rank)]),self.grid_data.shape)
+        self.B.backward_angle(self.m,rank,np.array([self.fields[i].data for i in range(3**rank)]),self.grid_data)
+        if rank > 0:
+            self.grid_data = np.einsum("ij,j...->i...",self.B.unitary3D(rank=rank,adjoint=False),self.grid_data)
 
         self.data = self.grid_data
         self._layout = 'g'
@@ -589,37 +605,50 @@ class TensorField_3D(TensorField):
         B = self.B
 
         if self._layout == 'g':
+            if barrier: self.domain.dist.comm_cart.Barrier()
+            if timing: start_time = time.time()
             for i, field in enumerate(self.fields):
                 field.layout = self.phi_layout
-                field.data = self.data[i]
+                np.copyto(field.data,self.data[i])
                 field.require_layout(self.th_m_layout)
-                self.mthr_data[i] = field.data
-            self.data = self.mthr_data
+                np.copyto(self.mthr_data[i],field.data)
             self._layout = 3
+            if timing:
+                end_time = time.time()
+                self.B.transpose_time += end_time-start_time
+            if barrier: self.domain.dist.comm_cart.Barrier()
         elif self._layout == 3:
+            if barrier: self.domain.dist.comm_cart.Barrier()
             for m in range(B.m_min,B.m_max+1):
                 m_local = m - B.m_min
-                B.forward_angle(m,rank,np.array(self.data[:,m_local]),self.mlr_ell_data[:,m_local,:,:])
-            self.data = self.mlr_ell_data
+                B.forward_angle(m,rank,np.array(self.mthr_data[:,m_local]),self.mlr_ell_data[:,m_local,:,:])
             self._layout = 2
+            if barrier: self.domain.dist.comm_cart.Barrier()
         elif self._layout == 2:
+            if barrier: self.domain.dist.comm_cart.Barrier()
+            if timing: start_time = time.time()
             if self.ell_r_layout != self.r_ell_layout:
                 for i, field in enumerate(self.fields):
                     field.layout = self.ell_r_layout
-                    field.data = self.data[i]
+                    np.copyto(field.data,self.mlr_ell_data[i])
                     self.domain.distributor.paths[1].decrement([field])
-                    self.rlm_data[i] = field.data.T
+                    np.copyto(self.rlm_data[i],field.data.T)
             else:
                 for i, field in enumerate(self.fields):
-                    self.rlm_data[i] = self.data[i].T
-            self.data = self.rlm_data
+                    np.copyto(self.rlm_data[i],self.mlr_ell_data[i].T)
             self._layout = 1
+            if timing:
+                end_time = time.time()
+                self.B.transpose_time += end_time-start_time
+            if barrier: self.domain.dist.comm_cart.Barrier()
         elif self._layout == 1:
+            if barrier: self.domain.dist.comm_cart.Barrier()
             for ell in range(B.ell_min, B.ell_max + 1):
                 ell_local = ell - B.ell_min
-                self.coeff_data[ell_local] = self.B.radial_forward(ell,rank,self.data[:,:,ell_local,:])
+                self.B.radial_forward(ell,rank,self.rlm_data[:,:,ell_local,:],self.coeff_data[ell_local])
             self.data = self.coeff_data
             self._layout = 'c'
+            if barrier: self.domain.dist.comm_cart.Barrier()
 
     def require_grid_space(self):
         """Transform from coeff space to grid space"""
@@ -633,36 +662,53 @@ class TensorField_3D(TensorField):
         B = self.B
 
         if self._layout == 'c':
+            if barrier: self.domain.dist.comm_cart.Barrier()
             for ell in range(B.ell_min, B.ell_max+1):
                 ell_local = ell - B.ell_min
-                self.mlr_r_data[:,:,ell_local,:] = B.radial_backward(ell,rank,self.data[ell_local]).transpose(0,2,1)
-            self.data = self.mlr_r_data
+                B.radial_backward(ell,rank,self.data[ell_local],self.rlm_data[:,:,ell_local,:])
+                self.rlm_data[:,:,ell_local,:] = np.einsum("ij,j...->i...",self.B.Q[(ell,rank)],self.rlm_data[:,:,ell_local,:])
+            np.copyto(self.mlr_r_data,self.rlm_data.transpose(0,3,2,1),casting='no')
             self._layout = 1
+            if barrier: self.domain.dist.comm_cart.Barrier()
         elif self._layout == 1:
+            if barrier: self.domain.dist.comm_cart.Barrier()
+            if timing: start_time = time.time()
             if self.ell_r_layout != self.r_ell_layout:
                 for i, field in enumerate(self.fields):
                     field.layout = self.r_ell_layout
-                    field.data = self.data[i]
+                    np.copyto(field.data,self.mlr_r_data[i])
                     self.domain.distributor.paths[1].increment([field])
-                    self.mlr_ell_data[i] = field.data
+                    np.copyto(self.mlr_ell_data[i],field.data)
             else:
                 for i, field in enumerate(self.fields):
-                    self.mlr_ell_data[i] = self.data[i]
-            self.data = self.mlr_ell_data
+                    np.copyto(self.mlr_ell_data[i],self.mlr_r_data[i])
             self._layout = 2
+            if timing:
+                end_time = time.time()
+                self.B.transpose_time += end_time-start_time
+            if barrier: self.domain.dist.comm_cart.Barrier()
         elif self._layout == 2:
+            if barrier: self.domain.dist.comm_cart.Barrier()
             for m in range(B.m_min, B.m_max + 1):
                 m_local = m - B.m_min
-                self.mthr_data[:,m_local,:,:] = B.backward_angle(m,rank,self.data[:,m_local,:,:],self.mthr_data[:,m_local,:,:].shape)
-            self.data = self.mthr_data
+                B.backward_angle(m,rank,self.mlr_ell_data[:,m_local,:,:],self.mthr_data[:,m_local,:,:])
+            if rank > 0:
+                self.mthr_data = np.einsum("ij,j...->i...",self.B.unitary3D(rank=rank,adjoint=False),self.mthr_data)
             self._layout = 3
+            if barrier: self.domain.dist.comm_cart.Barrier()
         elif self._layout == 3:
+            if barrier: self.domain.dist.comm_cart.Barrier()
+            if timing: start_time = time.time()
             for i, field in enumerate(self.fields):
                 field.layout = self.th_m_layout
-                field.data = self.data[i]
+                np.copyto(field.data,self.mthr_data[i])
                 field.require_layout(self.phi_layout)
-                self.grid_data[i] = field.data
+                np.copyto(self.grid_data[i],field.data)
             self.data = self.grid_data
+            if timing:
+                end_time = time.time()
+                self.B.transpose_time += end_time-start_time
             self._layout = 'g'
+            if barrier: self.domain.dist.comm_cart.Barrier()
 
 

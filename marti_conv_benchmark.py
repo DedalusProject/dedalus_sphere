@@ -6,6 +6,7 @@ from scipy.sparse        import linalg as spla
 import scipy.sparse      as sparse
 import scipy.special     as spec
 import dedalus.public as de
+from dedalus.extras.flow_tools import GlobalArrayReducer
 from dedalus.core.distributor import Distributor
 from mpi4py import MPI
 import matplotlib
@@ -192,6 +193,9 @@ class StateVector:
                                                                       taus))
 
     def unpack(self,u,p,T):
+        u.layout = 'c'
+        p.layout = 'c'
+        T.layout = 'c'
         for ell in range(ell_start,ell_end+1):
             ell_local = ell-ell_start
             end_u = u['c'][ell_local].shape[0]
@@ -209,8 +213,8 @@ rank = comm.rank
 size = comm.size
 
 # Resolution
-L_max = 15
-N_max = 15
+L_max = 31
+N_max = 31
 R_max = 3
 
 alpha_BC = 0
@@ -230,7 +234,7 @@ dt = 8e-5
 t_end = 20
 
 # Make domain
-mesh=[4,8]
+mesh=[2,2]
 phi_basis = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
 theta_basis = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
 r_basis = de.Fourier('r', N_max+1, interval=(0,1),dealias=N_dealias)
@@ -275,10 +279,10 @@ phi = domain.grid(0,scales=domain.dealias)[grid_slices[0],:,:]
 theta = B.grid(1,dimensions=3)[:,grid_slices[1],:] # local
 r = B.grid(2,dimensions=3)[:,:,grid_slices[2]] # local
 
-weight_theta = B.weight(1,dimensions=3)
-weight_r = B.weight(2,dimensions=3)
+weight_theta = B.weight(1,dimensions=3)[:,grid_slices[1],:]
+weight_r = B.weight(2,dimensions=3)[:,:,grid_slices[2]]
 
-Du = ball.TensorField_3D(2,B,domain)
+om = ball.TensorField_3D(1,B,domain)
 u  = ball.TensorField_3D(1,B,domain)
 p  = ball.TensorField_3D(0,B,domain)
 T  = ball.TensorField_3D(0,B,domain)
@@ -312,19 +316,21 @@ def nonlinear(state_vector, RHS, t):
     # get U in coefficient space
     state_vector.unpack(u,p,T)
 
+    DT.layout = 'c'
+    om.layout = 'c'
     # take derivatives
     for ell in range(ell_start,ell_end+1):
         ell_local = ell - ell_start
-        Du['c'][ell_local] = B.grad(ell,1,u['c'][ell_local])
+        B.curl(ell,1,u['c'][ell_local],om['c'][ell_local])
         DT['c'][ell_local] = B.grad(ell,0,T['c'][ell_local])
 
     # R = ez cross u
     ez = np.array([np.cos(theta),-np.sin(theta),0*np.cos(theta)])
+    u_rhs.layout = 'g'
+    T_rhs.layout = 'g'
     u_rhs['g'] = -B.cross_grid(ez,u['g'])
-    for i in range(3):
-        u_rhs['g'][i] -= Ekman*(u['g'][0]*Du['g'][i] + u['g'][1]*Du['g'][3*1+i] + u['g'][2]*Du['g'][3*2+i])
+    u_rhs['g'] += Ekman*B.cross_grid(u['g'],om['g'])
     u_rhs['g'][0] += Rayleigh*r*T['g'][0]
-    p_rhs['g'] = 0.
     T_rhs['g'] = S - Prandtl*(u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2])
 
     # transform (ell, r) -> (ell, N)
@@ -342,40 +348,7 @@ def nonlinear(state_vector, RHS, t):
 
     NL.pack(u_rhs,p_rhs,T_rhs)
 
-def backward_state(state_vector):
-
-    state_vector.unpack(u,p,T)
-
-    ur_global  = comm.gather(u['g'][0], root=0)
-    uth_global = comm.gather(u['g'][1], root=0)
-    uph_global = comm.gather(u['g'][2], root=0)
-    p_global   = comm.gather(p['g'], root=0)
-    T_global   = comm.gather(T['g'], root=0)
-
-    starts = comm.gather(phi_layout.start(scales=domain.dealias),root=0)
-    counts = comm.gather(phi_layout.local_shape(scales=domain.dealias),root=0)
-
-    if rank == 0:
-        ur_full  = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        uth_full = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        uph_full = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        p_full   = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        T_full   = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        for i in range(size):
-            spatial_slices = tuple(slice(s, s+c) for (s,c) in zip(starts[i], counts[i]))
-            ur_full[spatial_slices]  = ur_global[i]
-            uth_full[spatial_slices] = uth_global[i]
-            uph_full[spatial_slices] = uph_global[i]
-            p_full[spatial_slices]   = p_global[i]
-            T_full[spatial_slices]   = T_global[i]
-    else:
-        ur_full  = None
-        uth_full = None
-        uph_full = None
-        p_full   = None
-        T_full   = None
-
-    return ur_full,uth_full,uph_full,p_full,T_full
+reducer = GlobalArrayReducer(domain.dist.comm_cart)
 
 t = 0.
 
@@ -392,10 +365,10 @@ while t < t_end:
 
 
     if iter % 10 == 0:
-        ur_grid, uth_grid, uph_grid, p_grid, T_grid = backward_state(state_vector)
+        E0 = np.sum(weight_r*weight_theta*0.5*u['g']**2)*(np.pi)/((L_max+1)*L_dealias)
+        E0 = reducer.reduce_scalar(E0, MPI.SUM)
+        logger.info("iter: {:d}, dt={:e}, t/t_e={:e}, E0={:e}".format(iter, dt, t/t_end,E0))
         if rank == 0:
-            E0 = np.sum(weight_r*weight_theta* 0.5*(np.abs(ur_grid)**2 + np.abs(uth_grid)**2 + np.abs(uph_grid)**2) )*(np.pi)/(L_max+1)/L_dealias
-            logger.info("iter: {:d}, dt={:e}, t/t_e={:e}, E0={:e}".format(iter, dt, t/t_end,E0))
             t_list.append(t)
             E_list.append(E0)
 
@@ -408,5 +381,5 @@ if rank==0:
     print('simulation took: %f' %(end_time-start_time))
     t_list = np.array(t_list)
     E_list = np.array(E_list)
-    np.savetxt('marti_E_16_tau.dat',np.array([t_list,E_list]))
+    np.savetxt('marti_E_32_tau.dat',np.array([t_list,E_list]))
 
