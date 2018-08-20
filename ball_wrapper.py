@@ -147,7 +147,8 @@ class Ball:
         if timing: start_time = time.time()
 
         if rank == 0:
-            return np.array([self.S.backward_spin(m,0,data_in[0,self.S.L_min(m,0):])])
+            data_out[0] = self.S.backward_spin(m,0,data_in[0,self.S.L_min(m,0):])
+            return
 
         spins = self.spins(rank)
 
@@ -195,6 +196,7 @@ class Ball:
 
         if rank == 0:
             np.copyto(data_out,self.forward_component(ell,0,data_in[0]))
+            return
 
         degs = self.spins(rank)
         N = self.N_max - self.N_min(ell-self.R_max) + 1
