@@ -166,10 +166,11 @@ class Ball:
 
     # data is coeff representation of the ncc
     def ncc_matrix(self, N, k, ell, deg_in, deg_out, data, cutoff=1e-6):
-        q = k + self.a
+        q_in = self.a 
         m_in = deg_in  + 1/2
+        q_out = k + self.a
         m_out= ell + deg_out + 1/2
-        return clenshaw.ncc_matrix(N, q, m_in, q, m_out, data, cutoff=cutoff) /(0.5)**(3/4)
+        return clenshaw.ncc_matrix(N, q_in, m_in, q_out, m_out, data, cutoff=cutoff) /(0.5)**(3/4)
 
     def forward_component(self,ell,deg,data):
         # grid --> coefficients
