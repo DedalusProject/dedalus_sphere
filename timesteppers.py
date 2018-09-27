@@ -498,6 +498,24 @@ class RK222(RungeKuttaIMEX):
                   [0,  γ , 0],
                   [0, 1-γ, γ]])
 
+class RK443(RungeKuttaIMEX):
+    """3rd-order 4-stage DIRK+ERK scheme [Ascher 1997 sec 2.8]"""
+
+    stages = 4
+
+    c = np.array([0, 1/2, 2/3, 1/2, 1])
+
+    A = np.array([[  0  ,   0  ,  0 ,   0 , 0],
+                  [ 1/2 ,   0  ,  0 ,   0 , 0],
+                  [11/18,  1/18,  0 ,   0 , 0],
+                  [ 5/6 , -5/6 , 1/2,   0 , 0],
+                  [ 1/4 ,  7/4 , 3/4, -7/4, 0]])
+
+    H = np.array([[0,   0 ,   0 ,  0 ,  0 ],
+                  [0,  1/2,   0 ,  0 ,  0 ],
+                  [0,  1/6,  1/2,  0 ,  0 ],
+                  [0, -1/2,  1/2, 1/2,  0 ],
+                  [0,  3/2, -3/2, 1/2, 1/2]])
 
 class RKGFY(RungeKuttaIMEX):
     """2nd-order 2-stage scheme from Hollerbach and Marti"""
