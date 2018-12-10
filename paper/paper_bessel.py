@@ -1,4 +1,4 @@
-import ball_wrapper      as ball
+from dedalus_sphere import ball_wrapper      as ball
 import dedalus.public    as de
 import ball_bessel       as bessel
 import matplotlib

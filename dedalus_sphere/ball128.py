@@ -1,6 +1,6 @@
 import numpy             as np
 import scipy             as sp
-import jacobi128         as jacobi
+from . import jacobi128         as jacobi
 import scipy.sparse      as sparse
 
 alpha = -0.5 # default for a default. Base value of floating Jabobi type index; could go in a configuration file.
@@ -10,13 +10,13 @@ def quadrature(N_max,a=alpha,**kw):
     return z, w/np.sqrt(32)
 
 def polynomial(N,k,ell,z,a=alpha):
-    """ N is max degree of output Jacobi polynomial. 
+    """ N is max degree of output Jacobi polynomial.
         There will be blood if N >> len(z) - ell//2."""
-    
+
     q, m = k + a, ell+1/2
 
     init = np.sqrt(2**(k+5/2))*jacobi.envelope(q,m,q,1/2,z)
-    
+
     return jacobi.recursion(N,q,m,z,init)
 
 def N_min(ell):
@@ -51,29 +51,29 @@ def connection(N,ell,a,b):
     return Qb.dot((w*Qa).T)
 
 def operator(op,N,k,ell,a=alpha):
-    
+
     q, m = k + a, ell+1/2
-    
+
     # zeros
     if (op == '0'):  return jacobi.operator('0',N,q,m)
-    
+
     # identity
     if (op == 'I'):  return jacobi.operator('I',N,q,m)
-    
+
     # conversion
     if (op == 'E'):  return jacobi.operator('A+',N,q,m,rescale=np.sqrt(0.5))
-    
+
     # derivatives
     if (op == 'D-'): return jacobi.operator('C+',N,q,m,rescale=2.0)
     if (op == 'D+'): return jacobi.operator('D+',N,q,m,rescale=2.0)
-    
+
     # r multiplication
     if (op == 'R-'): return jacobi.operator('B-',N,q,m,rescale=np.sqrt(0.5))
     if (op == 'R+'): return jacobi.operator('B+',N,q,m,rescale=np.sqrt(0.5))
 
     # z = 2*r*r-1 multiplication
     if op == 'Z': return jacobi.operator('J',N,q,m)
-    
+
     if op == 'r=1': return jacobi.operator('z=+1',N,q,m,rescale=np.sqrt(2.0))
 
 def zeros(N,ell,deg_out,deg_in):
@@ -84,16 +84,16 @@ def unitary3D(rank=1,adjoint=False):
     """ Transforms the components of vectors and tensors.
         U:        (v[r],v[th],v[ph]) --> (v[-],v[0], v[+])
         Uadjoint: (v[-],v[0], v[+])  --> (v[r],v[th],v[ph])
-        
+
         Parameters
         ----------
         rank: int
         rank=1 for vectors, rank=2 for matrices, etc
         adjoint: T/F
         returns the inverse transformation
-        
+
         """
-    
+
     if adjoint :
         U       = np.sqrt(0.5)*np.array([[0,1,-1j],[np.sqrt(2.0),0,0],[0,1,1j]])
     else:
@@ -107,14 +107,14 @@ def unitary3D(rank=1,adjoint=False):
 def xi(mu,ell):
     """
         Normalised derivative scale factors. xi(-1,ell)**2 + xi(+1,ell)**2 = 1.
-        
+
         Parameters
         ----------
         mu  : int
         ball spin parameter. Must be -1,+1,0. xi(0,l) = 0 by definition.
         ell : int
         spherical harmonic degree.
-        
+
         """
     if mu == [-1,+1]: return xi(-1,ell), xi(+1,ell)
     if mu == [+1,-1]: return xi(+1,ell), xi(-1,ell)
@@ -125,7 +125,7 @@ def xi(mu,ell):
 def k(mu,ell,s):
     """
         Angular deravitive scale factors.
-        
+
         Parameters
         ----------
         mu  : int
@@ -134,7 +134,7 @@ def k(mu,ell,s):
         spherical harmonic degree.
         s   : int
         total spin weight
-        
+
         """
     if (ell < mu*s) or (ell < -mu*s - 1): return np.inf
     return -mu*np.sqrt((ell-mu*s)*(ell+mu*s+1)/2)

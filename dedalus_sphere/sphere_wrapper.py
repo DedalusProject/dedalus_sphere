@@ -1,6 +1,6 @@
 
 import numpy     as np
-import sphere128 as sph
+from . import sphere128 as sph
 from dedalus.tools.cache import CachedMethod
 
 class Sphere:
@@ -16,21 +16,21 @@ class Sphere:
         self.cos_grid,self.weights = sph.quadrature(self.N_theta-1,niter=3,report_error=False)
         self.grid = np.arccos(self.cos_grid)
         self.sin_grid = np.sqrt(1-self.cos_grid**2)
-        
+
         self.pushY, self.pullY = {}, {}
-        
+
         for s in range(-S_max,S_max+1):
             for m in range(m_min,m_max+1):
                 Y = sph.Y(self.L_max,m,s,self.cos_grid)
                 self.pushY[(m,s)] = (self.weights*Y).astype(np.float64)
                 self.pullY[(m,s)] = (Y.T).astype(np.float64)
-    
+
         # downcast to double precision
         self.grid     = self.grid.astype(np.float64)
         self.weights  = self.weights.astype(np.float64)
         self.sin_grid = self.sin_grid.astype(np.float64)
         self.cos_grid = self.cos_grid.astype(np.float64)
-    
+
     @CachedMethod
     def op(self,op_name,m,s):
         return sph.operator(op_name,self.L_max,m,s).astype(np.float64)
@@ -45,7 +45,7 @@ class Sphere:
     def forward_spin(self,m,s,data):
         # grid --> coefficients
         return self.pushY[(m,s)].dot(data)
-    
+
     def backward_spin(self,m,s,data):
         # coefficients --> grid
         return self.pullY[(m,s)].dot(data)
@@ -78,7 +78,7 @@ class Sphere:
             return self.forward_spin(m,0,data)
 
         (start_index,end_index,spin) = self.tensor_index(m,rank)
-   
+
         if not unitary:
             unitary = self.unitary(rank=rank,adjoint=True)
 

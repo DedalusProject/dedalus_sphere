@@ -1,12 +1,12 @@
 
 import numpy     as np
 from scipy.sparse import linalg as spla
-import sphere_wrapper as sph
-import ball128 as ball
+from . import sphere_wrapper as sph
+from . import ball128 as ball
 from dedalus.tools.cache import CachedMethod
 from dedalus.tools.array import reshape_vector
-import clenshaw
-import jacobi128 as jacobi
+from . import clenshaw
+from . import jacobi128 as jacobi
 import time
 
 from dedalus.tools.config import config

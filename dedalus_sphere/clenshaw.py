@@ -1,7 +1,7 @@
 
 from scipy import sparse
 import numpy as np
-import jacobi128 as jacobi
+from . import jacobi128 as jacobi
 
 # called from basis of ncc (i.e., r)
 # A, B are from basis that the ncc is in

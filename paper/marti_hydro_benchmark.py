@@ -1,5 +1,5 @@
-import ball_wrapper as ball
-import ball128
+from dedalus_sphere import ball_wrapper as ball
+from dedalus_sphere import ball128
 import numpy as np
 from   scipy.linalg      import eig
 from scipy.sparse        import linalg as spla
@@ -12,7 +12,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import time
-import timesteppers
+from dedalus_sphere import timesteppers
 
 # Gives LHS matrices for hydro.
 
@@ -165,7 +165,7 @@ dt = 0.02
 t_end = 40
 
 # Make domain
-mesh=None
+mesh=[2,2]
 phi_basis = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
 theta_basis = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
 r_basis = de.Fourier('r', N_r+1, interval=(0,1),dealias=N_dealias)
@@ -282,7 +282,7 @@ def nonlinear(state_vector, NL, t):
         # multiply by conversion matrices (may be very important)
         u_rhs['c'][ell_local] = M[ell_local][:M_size,:M_size].dot(u_rhs['c'][ell_local])
 
-    RHS.pack(u_rhs,p_rhs,BC_dB)
+    NL.pack(u_rhs,p_rhs,BC_dB)
 
 def backward_state(state_vector):
 

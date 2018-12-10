@@ -1,5 +1,5 @@
-import ball_wrapper as ball
-import ball128
+from dedalus_sphere import ball_wrapper as ball
+from dedalus_sphere import ball128
 import numpy as np
 from   scipy.linalg      import eig
 from scipy.sparse        import linalg as spla
@@ -13,7 +13,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import time
-import timesteppers
+from dedalus_sphere import timesteppers
 
 import logging
 logger = logging.getLogger(__name__)
@@ -29,23 +29,23 @@ def BC_rows(N):
     return N0,N1,N2,N4
 
 def matrices(N,ell,Ekman,Prandtl,Rayleigh):
-    
+
     def D(mu,i,deg):
         if mu == +1: return B.op('D+',N,i,ell+deg)
         if mu == -1: return B.op('D-',N,i,ell+deg)
-    
+
     def E(i,deg): return B.op('E',N,i,ell+deg)
 
     def C(deg): return ball128.connection(N,ell+deg,alpha_BC,2)
-    
+
     Z = B.op('0',N,0,ell)
-    
+
     N0 = N
     N1 = N + N0 + 1
     N2 = N + N1 + 1
     N3 = N + N2 + 1
     N4 = N + N3 + 1
-    
+
     if ell == 0:
         I = B.op('I',N,0,ell).tocsr()
         M44 = Prandtl*E(1, 0).dot(E( 0, 0))
@@ -77,13 +77,13 @@ def matrices(N,ell,Ekman,Prandtl,Rayleigh):
         M = M.tocsr()
 
         return M, L
-    
+
     xim, xip = B.xi([-1,+1],ell)
-    
+
     M00 = Ekman*E(1,-1).dot(E( 0,-1))
     M11 = Ekman*E(1, 0).dot(E( 0, 0))
     M22 = Ekman*E(1,+1).dot(E( 0,+1))
-    M44 = Prandtl*E(1, 0).dot(E( 0, 0))    
+    M44 = Prandtl*E(1, 0).dot(E( 0, 0))
 
     M=sparse.bmat([[M00, Z,   Z,  Z,   Z],
                    [Z, M11,   Z,  Z,   Z],
@@ -91,15 +91,15 @@ def matrices(N,ell,Ekman,Prandtl,Rayleigh):
                    [Z,   Z,   Z,  Z,   Z],
                    [Z,   Z,   Z,  Z, M44]])
     M = M.tocsr()
-                   
+
     L00 = -Ekman*D(-1,1, 0).dot(D(+1, 0,-1))
     L11 = -Ekman*D(-1,1,+1).dot(D(+1, 0, 0))
     L22 = -Ekman*D(+1,1, 0).dot(D(-1, 0,+1))
     L44 = -D(-1,1,+1).dot(D(+1, 0, 0))
-               
+
     L03 = xim*E(+1,-1).dot(D(-1,0,0))
     L23 = xip*E(+1,+1).dot(D(+1,0,0))
-        
+
     L30 = xim*D(+1,0,-1)
     L32 = xip*D(-1,0,+1)
 
@@ -361,7 +361,7 @@ iter = 0
 
 while t < t_end:
 
-    nonlinear(state_vector,NL,t) 
+    nonlinear(state_vector,NL,t)
 
 
     if iter % 10 == 0:

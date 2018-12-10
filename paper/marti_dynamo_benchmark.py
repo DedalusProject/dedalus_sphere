@@ -1,5 +1,5 @@
-import ball_wrapper as ball
-import ball128
+from dedalus_sphere import ball_wrapper as ball
+from dedalus_sphere import ball128
 import numpy as np
 from   scipy.linalg      import eig
 from scipy.sparse        import linalg as spla
@@ -13,7 +13,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import time
-import timesteppers
+from dedalus_sphere import timesteppers
 import pickle
 
 
@@ -32,17 +32,17 @@ def BC_rows(N):
     return N0,N1,N2,N4,N5,N6,N7
 
 def matrices(N,ell,Ekman,Rossby,q):
-    
+
     def D(mu,i,deg):
         if mu == +1: return B.op('D+',N,i,ell+deg)
         if mu == -1: return B.op('D-',N,i,ell+deg)
-    
+
     def E(i,deg): return B.op('E',N,i,ell+deg)
-    
+
     def C(deg): return ball128.connection(N,ell+deg,alpha_BC,2)
 
     Z = B.op('0',N,0,ell)
-    
+
     N0 = N
     N1 = N + N0 + 1
     N2 = N + N1 + 1
@@ -52,7 +52,7 @@ def matrices(N,ell,Ekman,Rossby,q):
     N6 = N + N5 + 1
     N7 = N + N6 + 1
     N8 = N + N7 + 1
-   
+
     if ell == 0:
         I = B.op('I',N,0,ell).tocsr()
         M = sparse.bmat([[Z,Z,Z,Z,Z,Z,Z,Z,Z],
@@ -91,9 +91,9 @@ def matrices(N,ell,Ekman,Rossby,q):
         M = M.tocsr()
 
         return M, L
-    
+
     xim, xip = B.xi([-1,+1],ell)
-    
+
     M00 = Rossby*E(1,-1).dot(E( 0,-1))
     M11 = Rossby*E(1, 0).dot(E( 0, 0))
     M22 = Rossby*E(1,+1).dot(E( 0,+1))
@@ -112,7 +112,7 @@ def matrices(N,ell,Ekman,Rossby,q):
                    [Z,   Z,   Z,  Z,   Z,   Z,   Z, M77,   Z],
                    [Z,   Z,   Z,  Z,   Z,   Z,   Z,   Z,   Z]])
     M = M.tocsr()
-                   
+
     L00 = -Ekman*D(-1,1, 0).dot(D(+1, 0,-1))
     L11 = -Ekman*D(-1,1,+1).dot(D(+1, 0, 0))
     L22 = -Ekman*D(+1,1, 0).dot(D(-1, 0,+1))
@@ -120,10 +120,10 @@ def matrices(N,ell,Ekman,Rossby,q):
     L55 = -D(-1,1, 0).dot(D(+1, 0,-1))
     L66 = -D(-1,1,+1).dot(D(+1, 0, 0))
     L77 = -D(+1,1, 0).dot(D(-1, 0,+1))
-               
+
     L03 = L58 = xim*E(+1,-1).dot(D(-1,0,0))
     L23 = L78 = xip*E(+1,+1).dot(D(+1,0,0))
-    
+
     L30 = L85 = xim*D(+1,0,-1)
     L32 = L87 = xip*D(-1,0,+1)
 
@@ -459,7 +459,7 @@ reducer = GlobalArrayReducer(domain.dist.comm_cart)
 
 while t < t_end:
 
-    nonlinear(state_vector,NL,t) 
+    nonlinear(state_vector,NL,t)
 
     if iter % 5 == 0:
         state_vector.unpack(u,p,T,A,pi)
