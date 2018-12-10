@@ -97,7 +97,7 @@ class MultistepIMEX:
         if STORE_LU:
             update_LHS = ((a0, b0) != self._LHS_params)
             self._LHS_params = (a0, b0)
-            
+
         ell_start = B.ell_min
         ell_end = B.ell_max
         m_start = B.m_min
@@ -415,6 +415,10 @@ class RungeKuttaIMEX:
         c = self.c
         k = dt
 
+        if STORE_LU:
+            update_LHS = (k != self._LHS_params)
+            self._LHS_params = k
+
         ell_start = B.ell_min
         ell_end = B.ell_max
         m_start = B.m_min
@@ -426,8 +430,9 @@ class RungeKuttaIMEX:
             for m in range(m_start,m_end+1):
                 m_local = m-m_start
                 index = ell_local*m_size+m_local
-
                 MX0.data[index] = M[ell_local].dot(state_vector.data[index])
+            if STORE_LU and update_LHS:
+                LU[ell_local] = [None] * (self.stages+1)
 
         # Compute stages
         # (M + k Hii L).X(n,i) = M.X(n,0) + k Aij F(n,j) - k Hij L.X(n,j)
@@ -440,6 +445,8 @@ class RungeKuttaIMEX:
             for ell in range(ell_start,ell_end+1):
                 ell_local = ell-ell_start
                 P[ell_local] = M[ell_local] + (k*H[i,i])*L[ell_local]
+                if STORE_LU and update_LHS:
+                    LU[ell_local][i] = linalg.splu(P[ell_local].tocsc(), permc_spec=PERMC_SPEC)
                 for m in range(m_start,m_end+1):
                     m_local = m-m_start
                     index = ell_local*m_size+m_local
@@ -453,7 +460,10 @@ class RungeKuttaIMEX:
                         RHS.data[index] -= k * H[i,j] * LX[j].data[index]
 
            # Solve
-                    state_vector.data[index] = linalg.spsolve(P[ell_local],RHS.data[index], use_umfpack=USE_UMFPACK, permc_spec=PERMC_SPEC)
+                    if STORE_LU:
+                        state_vector.data[index] = LU[ell_local][i].solve(RHS.data[index])
+                    else:
+                        state_vector.data[index] = linalg.spsolve(P[ell_local],RHS.data[index], use_umfpack=USE_UMFPACK, permc_spec=PERMC_SPEC)
 
 
 class RK111(RungeKuttaIMEX):
@@ -488,6 +498,24 @@ class RK222(RungeKuttaIMEX):
                   [0,  γ , 0],
                   [0, 1-γ, γ]])
 
+class RK443(RungeKuttaIMEX):
+    """3rd-order 4-stage DIRK+ERK scheme [Ascher 1997 sec 2.8]"""
+
+    stages = 4
+
+    c = np.array([0, 1/2, 2/3, 1/2, 1])
+
+    A = np.array([[  0  ,   0  ,  0 ,   0 , 0],
+                  [ 1/2 ,   0  ,  0 ,   0 , 0],
+                  [11/18,  1/18,  0 ,   0 , 0],
+                  [ 5/6 , -5/6 , 1/2,   0 , 0],
+                  [ 1/4 ,  7/4 , 3/4, -7/4, 0]])
+
+    H = np.array([[0,   0 ,   0 ,  0 ,  0 ],
+                  [0,  1/2,   0 ,  0 ,  0 ],
+                  [0,  1/6,  1/2,  0 ,  0 ],
+                  [0, -1/2,  1/2, 1/2,  0 ],
+                  [0,  3/2, -3/2, 1/2, 1/2]])
 
 class RKGFY(RungeKuttaIMEX):
     """2nd-order 2-stage scheme from Hollerbach and Marti"""
@@ -503,5 +531,3 @@ class RKGFY(RungeKuttaIMEX):
     H = np.array([[0   , 0  ,   0],
                   [0.5 , 0.5,   0],
                   [0.5 , 0  , 0.5]])
-
-

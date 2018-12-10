@@ -7,6 +7,7 @@ import scipy.sparse      as sparse
 import scipy.special     as spec
 import dedalus.public as de
 from dedalus.core.distributor import Distributor
+from dedalus.extras.flow_tools import GlobalArrayReducer
 from mpi4py import MPI
 import matplotlib
 matplotlib.use('Agg')
@@ -182,8 +183,8 @@ def matrices(N,ell,Ekman,Rossby,q):
     col2 = np.concatenate((np.zeros((N1+1,1)),tau2,np.zeros((N8-N2,1))))
     col3 = np.concatenate((np.zeros((N3+1,1)),tau3,np.zeros((N8-N4,1))))
     col4 = np.concatenate((np.zeros((N4+1,1)),tau4,np.zeros((N8-N5,1))))
-    col5 = np.concatenate((np.zeros((N5+1,1)),tau4,np.zeros((N8-N6,1))))
-    col6 = np.concatenate((np.zeros((N6+1,1)),tau4,np.zeros((N8-N7,1))))
+    col5 = np.concatenate((np.zeros((N5+1,1)),tau5,np.zeros((N8-N6,1))))
+    col6 = np.concatenate((np.zeros((N6+1,1)),tau6,np.zeros((N8-N7,1))))
 
     L = sparse.bmat([[   L, col0, col1, col2, col3, col4, col5, col6],
                      [row0,    0,    0,    0,    0,    0,    0,    0],
@@ -237,6 +238,11 @@ class StateVector:
                                                                       taus))
 
     def unpack(self,u,p,T,A,pi):
+        u.layout = 'c'
+        p.layout = 'c'
+        T.layout = 'c'
+        A.layout = 'c'
+        pi.layout= 'c'
         for ell in range(ell_start,ell_end+1):
             ell_local = ell-ell_start
             end_u = u['c'][ell_local].shape[0]
@@ -280,8 +286,8 @@ dt = 0.000005
 t_end = 10
 
 # Make domain
-#mesh = [6,6]
-mesh = None
+mesh = [6,6]
+#mesh = None
 phi_basis = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
 theta_basis = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
 r_basis = de.Fourier('r', N_r+1, interval=(0,1),dealias=N_dealias)
@@ -326,17 +332,17 @@ phi = domain.grid(0,scales=domain.dealias)[grid_slices[0],:,:]
 theta = B.grid(1,dimensions=3)[:,grid_slices[1],:] # local
 r = B.grid(2,dimensions=3)[:,:,grid_slices[2]] # local
 
-weight_theta = B.weight(1,dimensions=3)
-weight_r = B.weight(2,dimensions=3)
+weight_theta = B.weight(1,dimensions=3)[:,grid_slices[1],:]
+weight_r = B.weight(2,dimensions=3)[:,:,grid_slices[2]]
 
-Du = ball.TensorField_3D(2,B,domain)
+om = ball.TensorField_3D(1,B,domain)
 u  = ball.TensorField_3D(1,B,domain)
 p  = ball.TensorField_3D(0,B,domain)
 T  = ball.TensorField_3D(0,B,domain)
 DT = ball.TensorField_3D(1,B,domain)
 A  = ball.TensorField_3D(1,B,domain)
 H  = ball.TensorField_3D(1,B,domain)
-DH = ball.TensorField_3D(2,B,domain)
+J  = ball.TensorField_3D(1,B,domain)
 pi = ball.TensorField_3D(0,B,domain)
 
 u_rhs = ball.TensorField_3D(1,B,domain)
@@ -395,37 +401,31 @@ def nonlinear(state_vector, RHS, t):
     state_vector.unpack(u,p,T,A,pi)
 
     H.layout = 'c'
-    # H = curl(A)
+    om.layout = 'c'
+    J.layout = 'c'
     for ell in range(ell_start,ell_end+1):
         ell_local = ell - ell_start
         B.curl(ell,1,A['c'][ell_local],H['c'][ell_local])
+        B.curl(ell,1,u['c'][ell_local],om['c'][ell_local])
+        B.curl(ell,1,H['c'][ell_local],J['c'][ell_local])
 
-    Du.layout = 'c'
     DT.layout = 'c'
-    DH.layout = 'c'
     # take derivatives
     for ell in range(ell_start,ell_end+1):
         ell_local = ell - ell_start
-        Du['c'][ell_local] = B.grad(ell,1,u['c'][ell_local])
         DT['c'][ell_local] = B.grad(ell,0,T['c'][ell_local])
-        DH['c'][ell_local] = B.grad(ell,1,H['c'][ell_local])
 
     # R = ez cross u
     ez = np.array([np.cos(theta),-np.sin(theta),0*np.cos(theta)])
     u_rhs.layout = 'g'
     u_rhs['g'] = -B.cross_grid(ez,u['g'])
-    for i in range(3):
-        u_rhs['g'][i] -= Rossby*(u['g'][0]*Du['g'][i] + u['g'][1]*Du['g'][3*1+i] + u['g'][2]*Du['g'][3*2+i])
-        u_rhs['g'][i] +=        (H['g'][0]*DH['g'][i] + H['g'][1]*DH['g'][3*1+i] + H['g'][2]*DH['g'][3*2+i])
+    u_rhs['g'] += B.cross_grid(J['g'],H['g'])
+    u_rhs['g'] += Rossby*B.cross_grid(u['g'],om['g'])
     u_rhs['g'][0] += q*Rayleigh*r*T['g'][0]
-    p_rhs.layout = 'g'
-    p_rhs['g'] = 0.
     T_rhs.layout = 'g'
     T_rhs['g'] = S - (u['g'][0]*DT['g'][0] + u['g'][1]*DT['g'][1] + u['g'][2]*DT['g'][2])
     A_rhs.layout = 'g'
     A_rhs['g'] = B.cross_grid(u['g'],H['g'])
-    pi_rhs.layout = 'g'
-    pi_rhs['g']= 0.
 
     # transform (ell, r) -> (ell, N)
     for ell in range(ell_start, ell_end+1):
@@ -445,58 +445,6 @@ def nonlinear(state_vector, RHS, t):
 
     NL.pack(u_rhs,p_rhs,T_rhs,A_rhs,pi_rhs)
 
-def backward_state(state_vector):
-
-    state_vector.unpack(u,p,T,A,pi)
-
-    # H = curl(A)
-    for ell in range(ell_start,ell_end+1):
-        ell_local = ell - ell_start
-        B.curl(ell,1,A['c'][ell_local],H['c'][ell_local])
-
-    ur_global  = comm.gather(u['g'][0], root=0)
-    uth_global = comm.gather(u['g'][1], root=0)
-    uph_global = comm.gather(u['g'][2], root=0)
-    p_global   = comm.gather(p['g'], root=0)
-    T_global   = comm.gather(T['g'], root=0)
-    Br_global  = comm.gather(H['g'][0], root=0)
-    Bth_global = comm.gather(H['g'][1], root=0)
-    Bph_global = comm.gather(H['g'][2], root=0)
-
-    starts = comm.gather(phi_layout.start(scales=domain.dealias),root=0)
-    counts = comm.gather(phi_layout.local_shape(scales=domain.dealias),root=0)
-
-    if rank == 0:
-        ur_full  = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        uth_full = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        uph_full = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        p_full   = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        T_full   = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        Br_full  = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        Bth_full = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        Bph_full = np.zeros(phi_layout.global_shape(scales=domain.dealias))
-        for i in range(size):
-            spatial_slices = tuple(slice(s, s+c) for (s,c) in zip(starts[i], counts[i]))
-            ur_full[spatial_slices]  = ur_global[i]
-            uth_full[spatial_slices] = uth_global[i]
-            uph_full[spatial_slices] = uph_global[i]
-            p_full[spatial_slices]   = p_global[i]
-            T_full[spatial_slices]   = T_global[i]
-            Br_full[spatial_slices]  = Br_global[i]
-            Bth_full[spatial_slices] = Bth_global[i]
-            Bph_full[spatial_slices] = Bph_global[i]
-    else:
-        ur_full  = None
-        uth_full = None
-        uph_full = None
-        p_full   = None
-        T_full   = None
-        Br_full  = None
-        Bth_full = None
-        Bph_full = None
-
-    return ur_full,uth_full,uph_full,p_full,T_full,Br_full,Bth_full,Bph_full
-
 t_list = []
 Ek_list = []
 Em_list = []
@@ -507,23 +455,27 @@ start_time = time.time()
 t = 0
 iter = 0
 
+reducer = GlobalArrayReducer(domain.dist.comm_cart)
+
 while t < t_end:
 
     nonlinear(state_vector,NL,t) 
 
     if iter % 5 == 0:
-        ur_grid, uth_grid, uph_grid, p_grid, T_grid, Br_grid, Bth_grid, Bph_grid = backward_state(state_vector)
-        if rank == 0:
-            Ek = np.sum(weight_r*weight_theta* 0.5*(np.abs(ur_grid)**2 + np.abs(uth_grid)**2 + np.abs(uph_grid)**2) )*(np.pi)/(L_max+1)/L_dealias
-            Em = np.sum(weight_r*weight_theta* 0.5/Rossby*(np.abs(Br_grid)**2 + np.abs(Bth_grid)**2 + np.abs(Bph_grid)**2) )*(np.pi)/(L_max+1)/L_dealias
-            print( t,iter,Ek,Em )
+        state_vector.unpack(u,p,T,A,pi)
 
-        if iter % 100000 == 0 and rank == 0:
-            output_num = iter // 100000
-            file = open('checkpoint_L%i' %output_num, 'wb')
-            for a in [ur_grid,uth_grid,uph_grid,p_grid,T_grid,Br_grid,Bth_grid,Bph_grid]:
-                pickle.dump(a,file)
-            file.close()
+        # H = curl(A)
+        for ell in range(ell_start,ell_end+1):
+            ell_local = ell - ell_start
+            B.curl(ell,1,A['c'][ell_local],H['c'][ell_local])
+
+        Ek = np.sum(weight_r*weight_theta* 0.5*u['g']**2)*(np.pi)/((L_max+1)*L_dealias)
+        Em = np.sum(weight_r*weight_theta* 0.5/Rossby*H['g']**2)*np.pi/((L_max+1)*L_dealias)
+
+        Ek = reducer.reduce_scalar(Ek, MPI.SUM)
+        Em = reducer.reduce_scalar(Em, MPI.SUM)
+        if rank == 0:
+            print( t,iter,Ek,Em )
 
     timestepper.step(dt, state_vector, B, L, M, P, NL, LU)
     t += dt

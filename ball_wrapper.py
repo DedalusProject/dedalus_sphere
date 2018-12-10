@@ -24,7 +24,7 @@ class Ball:
         if N_r == None: self.N_r = self.N_max + 1
         else: self.N_r = N_r
         self.a = a
-        
+
         if ell_min == None: ell_min =  0
         if ell_max == None: ell_max =  L_max
         if   m_min == None:   m_min =  0
@@ -42,16 +42,16 @@ class Ball:
 
         # grid and weights for the radial transforms
         z_projection, weights_projection = ball.quadrature(self.N_r-1,niter=3,a=a,report_error=False)
-        
+
         # grid and weights for radial integral using volume measure
-        
+
         z0, weights0 = ball.quadrature(self.N_r-1,a=0.0)
-        
+
         Q0           = ball.polynomial(self.N_r-1,0,0,z0,a=a)
         Q_projection = ball.polynomial(self.N_r-1,0,0,z_projection,a=a)
 
         self.dV = ((Q0.dot(weights0)).T).dot(weights_projection*Q_projection)
-        
+
         self.pushW, self.pullW = {}, {}
         self.Q = {}
 
@@ -60,7 +60,7 @@ class Ball:
             self.pushW[(ell)] = (weights_projection*W).astype(np.float64)
             self.pullW[(ell)] = (W.T).astype(np.float64)
 
-        for ell in range( ell_min, ell_max+1):        
+        for ell in range( ell_min, ell_max+1):
             self.Q[(ell,0)] = np.array([[1]])
             for deg in range(1,R_max+1):
                 self.Q[(ell,deg)] = ball.recurseQ(self.Q[(ell,deg-1)],ell,deg)
@@ -82,7 +82,7 @@ class Ball:
             self.LU_curl.append([None]*2)
 
         if timing:
-            self.radial_transform_time = 0.        
+            self.radial_transform_time = 0.
             self.angular_transform_time = 0.
             self.transpose_time = 0
 
@@ -131,7 +131,7 @@ class Ball:
             return
 
         spins, unitary = self.spins(rank), self.unitary3D(rank=rank,adjoint=True)
-        
+
         data_in = np.einsum("ij,j...->i...",unitary,data_in)
 
         # This may benefit from some cython. Maybe, maybe not. Keaton?
@@ -165,11 +165,15 @@ class Ball:
         return ball.N_min(ell)
 
     # data is coeff representation of the ncc
-    def ncc_matrix(self, N, k, ell, deg_in, deg_out, data, cutoff=1e-6):
-        q = k + self.a
+    def ncc_matrix(self, N, k, ell, deg_in, deg_out, data, cutoff=1e-6, name=""):
+        q_in = self.a
         m_in = deg_in  + 1/2
+        q_out = k + self.a
         m_out= ell + deg_out + 1/2
-        return clenshaw.ncc_matrix(N, q, m_in, q, m_out, data, cutoff=cutoff) /(0.5)**(3/4)
+        n_terms, max_term, matrix = clenshaw.ncc_matrix(N, q_in, m_in, q_out, m_out, data, cutoff=cutoff)
+        matrix /=  (0.5)**(3/4)
+        logger.debug("Expanded NCC {:s} to mode {:d} with {:d} terms.".format(name, max_term, n_terms))
+        return matrix
 
     def forward_component(self,ell,deg,data):
         # grid --> coefficients
@@ -179,7 +183,7 @@ class Ball:
             shape = np.array(data.shape)
             shape[0] = N
             return np.zeros(shape)
-    
+
     def backward_component(self,ell,deg,data):
         # coefficients --> grid
         N = self.N_max - self.N_min(ell-self.R_max) + 1
@@ -219,7 +223,7 @@ class Ball:
 
         degs = self.spins(rank)
         N =self.N_max - self.N_min(ell-self.R_max) + 1
-        
+
         for i in range(3**rank):
             data_out[i] = self.backward_component(ell,degs[i],data_in[i*N:(i+1)*N])
 
@@ -238,7 +242,7 @@ class Ball:
         N = self.N_max + 1 - self.N_min(ell-self.R_max)
         for i in range(3**rank):
             data_out[i*N:(i+1)*N] = data_in[i]
-    
+
     def rank(self,length):
         if length == 1:
             return 0
@@ -255,7 +259,7 @@ class Ball:
             if not self.LU_grad_initialized[i_LU][rank]:
                 logger.debug("LU_grad not initialized l={},rank={}".format(ell, rank))
                 self.LU_grad[i_LU][rank] = [None]*(4*(3**rank))
-            
+
         for i in range(3**rank):
             tau_bar = ball.bar(i,rank)
             N = self.N_max - self.N_min(ell-self.R_max)
@@ -286,7 +290,7 @@ class Ball:
 
         if STORE_LU_TRANSFORM and not self.LU_grad_initialized[i_LU][rank]:
             self.LU_grad_initialized[i_LU][rank] = True
-                
+
         return data_out
 
     def curl(self,ell,rank,data_in,data_out):
@@ -297,7 +301,7 @@ class Ball:
             if not self.LU_curl_initialized[i_LU][rank]:
                 logger.debug("LU_curl not initialized l={},rank={}".format(ell, rank))
                 self.LU_curl[i_LU][rank] = [None]*(3)
-        
+
         N = self.N_max - self.N_min(ell-self.R_max)
         xim = self.xi(-1,ell)
         xip = self.xi(+1,ell)
@@ -314,14 +318,14 @@ class Ball:
         else:
             data_out[:N+1] = 0.
 
-            
+
         C0 = self.op('E',N,0,ell,data_dtype)
         Dm = self.op('D-',N,0,ell+1,data_dtype)
         if STORE_LU_TRANSFORM:
             index = 1
             if not self.LU_curl_initialized[ell][rank]:
                 self.LU_curl[i_LU][rank][index] = spla.splu(C0)
-                
+
         if ell >= 1:
             Dp = self.op('D+',N,0,ell-1,data_dtype)
             if STORE_LU_TRANSFORM:
@@ -346,17 +350,17 @@ class Ball:
             data_out[2*(N+1):] = self.LU_curl[i_LU][rank][index].solve(1j*xim*Dp.dot(data_in[(N+1):2*(N+1)]))
         else:
             data_out[2*(N+1):] = spla.spsolve(Cp,1j*xim*Dp.dot(data_in[(N+1):2*(N+1)]))
-            
+
         if STORE_LU_TRANSFORM and not self.LU_curl_initialized[i_LU][rank]:
             self.LU_curl_initialized[i_LU][rank] = True
-                
+
     def div(self,data_in):
-        
+
         rank = self.rank(len(data_in))
         data_dtype = data_in[0].dtype
-        
+
         data_out = [None]*(3**(rank-1))
-        
+
         for i in range(3**(rank-1)):
             tau_bar   = ball.bar(i,rank-1)
             m_tau_bar = -1 + tau_bar
@@ -364,45 +368,45 @@ class Ball:
             # initialise arrays
             data_out[i] = []
             for ell in range(self.L_max+1):
-                
+
                 N = self.N_max - self.N_min(ell-self.R_max)
-                    
+
                 if ell+tau_bar == 0:
                     C   = self.op('E',N,0,ell+tau_bar,data_dtype)
                     Dm  = self.op('D-',N,0,ell+p_tau_bar,data_dtype)
                     xip = self.xi(+1,ell+tau_bar)
-                    
+
                     data_out[i].append(spla.spsolve(C,xip*Dm.dot(data_in[i+2*(3**(rank-1))][ell])))
-                    
+
                 elif ell+tau_bar > 0:
                     C   = self.op('E',N,0,ell+tau_bar,data_dtype)
                     Dm  = self.op('D-',N,0,ell+p_tau_bar,data_dtype)
                     Dp  = self.op('D+',N,0,ell+m_tau_bar,data_dtype)
                     xim, xip = self.xi([-1,+1],ell+tau_bar)
-                
+
                     data_out[i].append(spla.spsolve(C,xip*Dm.dot(data_in[i+2*(3**(rank-1))][ell])+xim*Dp.dot(data_in[i][ell])))
-                    
+
                 else:
                     data_out[i].append(0*data_in[i][ell])
-        
+
         return data_out
 
     def div_grad(self,data_in,ell_start=0,ell_end=None):
         if ell_end == None: ell_end = self.L_max
-        
+
         rank = self.rank(len(data_in))
-        
+
         data_out = [None]*(3**rank)
-        
+
         for i in range(3**rank):
             tau_bar   = ball.bar(i,rank)
             # initialise arrays
             data_out[i] = []
             for ell in range(ell_start,ell_end+1):
                 ell_local = ell - ell_start
-                
+
                 N = self.N_max - self.N_min(ell-self.R_max)
-                
+
                 if ell+tau_bar >= 0:
                     CC  = self.op('E',N,1,ell+tau_bar).dot(self.op('E',N,0,ell+tau_bar))
                     DD  = self.op('D-',N,1,ell+tau_bar+1).dot(self.op('D+',N,0,ell+tau_bar))
@@ -570,7 +574,7 @@ class TensorField_3D(TensorField):
         scales = (1,1,domain.dealias[2])
         local_ellr_shape = self.ell_r_layout.local_shape(scales=scales)
         ellr_shape = np.append(3**rank,np.array(local_ellr_shape))
-        self.mlr_ell_data = np.zeros(ellr_shape,dtype=np.complex128) 
+        self.mlr_ell_data = np.zeros(ellr_shape,dtype=np.complex128)
 
         local_rell_shape = self.r_ell_layout.local_shape(scales=scales)
         rell_shape = np.append(3**rank,np.array(local_rell_shape))
@@ -712,5 +716,3 @@ class TensorField_3D(TensorField):
                 self.B.transpose_time += end_time-start_time
             self._layout = 'g'
             if barrier: self.domain.dist.comm_cart.Barrier()
-
-

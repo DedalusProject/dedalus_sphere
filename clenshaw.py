@@ -63,13 +63,18 @@ def matrix_clenshaw(c, A, B, f0, cutoff):
     I = sparse.identity(f0.shape[0])
     # Clenshaw
     b0, b1 = 0*I, 0*I
+    n_terms = max_term = 0
     for n in reversed(range(N)):
         b1, b2 = b0, b1
         if abs(c[n]) > cutoff:
             b0 = (c[n] * I) + (A[n] @ b1) + (B[n+1] @ b2)
+            n_terms += 1
+            if max_term == 0 :
+                # reversed range, so first term is max_term
+                max_term = n
         else:
             b0 = (A[n] @ b1) + (B[n+1] @ b2)
-    return (b0 @ f0)
+    return n_terms, max_term, (b0 @ f0)
 
 def jacobi_matrix(N, a, b):
     J = jacobi.operator('J',N-1,a,b)
@@ -94,4 +99,3 @@ class DeferredTuple:
 
     def __len__(self):
         return self.size
-
