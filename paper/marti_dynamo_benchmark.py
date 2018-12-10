@@ -443,7 +443,7 @@ def nonlinear(state_vector, RHS, t):
         T_rhs['c'][ell_local] = M[ell_local][u_len+p_len:u_len+p_len+T_len,u_len+p_len:u_len+p_len+T_len].dot(T_rhs['c'][ell_local])
         A_rhs['c'][ell_local] = M[ell_local][u_len+p_len+T_len:u_len+p_len+T_len+A_len,u_len+p_len+T_len:u_len+p_len+T_len+A_len].dot(A_rhs['c'][ell_local])
 
-    NL.pack(u_rhs,p_rhs,T_rhs,A_rhs,pi_rhs)
+    RHS.pack(u_rhs,p_rhs,T_rhs,A_rhs,pi_rhs)
 
 t_list = []
 Ek_list = []

@@ -346,7 +346,7 @@ def nonlinear(state_vector, RHS, t):
         p_len = p_rhs['c'][ell_local].shape[0]
         T_rhs['c'][ell_local] = M[ell_local][u_len+p_len:u_len+2*p_len,u_len+p_len:u_len+2*p_len].dot(T_rhs['c'][ell_local])/Prandtl
 
-    NL.pack(u_rhs,p_rhs,T_rhs)
+    RHS.pack(u_rhs,p_rhs,T_rhs)
 
 reducer = GlobalArrayReducer(domain.dist.comm_cart)
 
