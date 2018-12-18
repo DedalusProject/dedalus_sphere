@@ -145,8 +145,8 @@ rank = comm.rank
 size = comm.size
 
 # Resolution
-L_max = 23
-N_max = 23
+L_max = 15
+N_max = 15
 R_max = 3
 
 alpha_BC = 0

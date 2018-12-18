@@ -93,7 +93,7 @@ class Sphere:
             data_c[start_index[i]:end_index[i]] = self.forward_spin(m,spin[i],data[i])
         return data_c
 
-    def backward(self,m,rank,data):
+    def backward(self,m,rank,data,unitary=None):
 
         if rank == 0:
             return self.backward_spin(m,0,data)
