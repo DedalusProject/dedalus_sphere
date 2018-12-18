@@ -1,5 +1,5 @@
 
-import ball_wrapper as ball
+from dedalus_sphere import ball_wrapper as ball
 import numpy as np
 from scipy.sparse import linalg as spla
 import scipy.sparse      as sparse
@@ -44,25 +44,25 @@ H['g'][2] = -3./4.*r*(-1+r**2)*np.cos(theta)* \
 
 for ell in range(1,L_max+1):
     N  = N_max - B_3D.N_min(ell-R_max)
-    
+
     Z = B_3D.op('0',N,0,ell)
-    
+
     xim = B_3D.xi(-1,ell)
     xip = B_3D.xi(+1,ell)
-    
+
     L00 = Z
     L02 = Z
-    
+
     Dm = B_3D.op('D-',N,0,ell).astype(np.complex128)
     L01 = -1j*xip*Dm
-    
+
     Dm_p = B_3D.op('D-',N,0,ell+1).astype(np.complex128)
     Dp_m = B_3D.op('D+',N,0,ell-1).astype(np.complex128)
-    
+
     L10 = -1j*xip*Dp_m
     L11 = Z
     L12 = 1j*xim*Dm_p
-    
+
     L20 = xim*Dp_m
     L21 = Z
     L22 = xip*Dm_p
@@ -76,14 +76,14 @@ for ell in range(1,L_max+1):
     L[N]=np.concatenate((B_3D.op('r=1',N,0,ell-1),np.zeros(2*(N+1))))
     L[2*N+1]=np.concatenate((np.zeros(N+1),B_3D.op('r=1',N,1,ell-1)*Dm,np.zeros(N+1)))
     L[3*N+2]=np.concatenate((np.zeros(2*(N+1)),B_3D.op('r=1',N,1,ell  )*Dm_p))
-    
+
     RHS = np.copy(H['c'][ell])
     Em = B_3D.op('E',N,0,ell-1).astype(np.complex128)
     E0 = B_3D.op('E',N,0,ell).astype(np.complex128)
     RHS[:(N+1)] = Em.dot(RHS[:(N+1)])
     RHS[(N+1):2*(N+1)] = E0.dot(RHS[(N+1):2*(N+1)])
     RHS[2*(N+1):] *= 0.
-    
+
     A['c'][ell] = spla.spsolve(L,RHS)
 
 A_analytic_0 = (3/2*r**2*(1-4*r**2+6*r**4-3*r**6)

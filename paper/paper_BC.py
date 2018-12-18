@@ -1,5 +1,5 @@
 import ball_diffusion as bd
-import ball_wrapper as ball
+from dedalus_sphere import ball_wrapper as ball
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt

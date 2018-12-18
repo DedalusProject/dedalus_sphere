@@ -1,3 +1,24 @@
+"""
+Dedalus script for full sphere boussinesq convection,
+based on Marti convective benchmark.
+
+Usage:
+    marti_conv_benchmark.py [options]
+
+Options:
+    --Ekman=<Ekman>                      Ekman number    [default: 3e-4]
+    --Rayleigh=<Rayleigh>                Rayleigh number [default: 95]
+    --Prandtl=<Prandtl>                  Prandtl number  [default: 1]
+    --L_max=<L_max>                      Max spherical harmonic [default: 31]
+    --N_max=<N_max>                      Max radial polynomial  [default: 31]
+    --mesh=<mesh>                        Processor mesh for 3-D runs
+
+    --run_time_diffusion=<run_time_d>    How long to run, in diffusion times [default: 20]
+    --run_time_iter=<run_time_i>         How long to run, in iterations
+
+    --label=<label>                      Additional label for run output directory
+"""
+
 import ball_wrapper as ball
 import ball128
 import numpy as np
@@ -13,13 +34,14 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import time
-import timesteppers
+import timesteppers as timesteppers
 
 import logging
 logger = logging.getLogger(__name__)
 
-# Gives LHS matrices for boussinesq
+accelerate_layout = True
 
+# Gives LHS matrices for boussinesq
 def BC_rows(N):
     N0 = N
     N1 = N + N0 + 1
@@ -29,23 +51,23 @@ def BC_rows(N):
     return N0,N1,N2,N4
 
 def matrices(N,ell,Ekman,Prandtl,Rayleigh):
-    
+
     def D(mu,i,deg):
         if mu == +1: return B.op('D+',N,i,ell+deg)
         if mu == -1: return B.op('D-',N,i,ell+deg)
-    
+
     def E(i,deg): return B.op('E',N,i,ell+deg)
 
     def C(deg): return ball128.connection(N,ell+deg,alpha_BC,2)
-    
+
     Z = B.op('0',N,0,ell)
-    
+
     N0 = N
     N1 = N + N0 + 1
     N2 = N + N1 + 1
     N3 = N + N2 + 1
     N4 = N + N3 + 1
-    
+
     if ell == 0:
         I = B.op('I',N,0,ell).tocsr()
         M44 = Prandtl*E(1, 0).dot(E( 0, 0))
@@ -77,13 +99,13 @@ def matrices(N,ell,Ekman,Prandtl,Rayleigh):
         M = M.tocsr()
 
         return M, L
-    
+
     xim, xip = B.xi([-1,+1],ell)
-    
+
     M00 = Ekman*E(1,-1).dot(E( 0,-1))
     M11 = Ekman*E(1, 0).dot(E( 0, 0))
     M22 = Ekman*E(1,+1).dot(E( 0,+1))
-    M44 = Prandtl*E(1, 0).dot(E( 0, 0))    
+    M44 = Prandtl*E(1, 0).dot(E( 0, 0))
 
     M=sparse.bmat([[M00, Z,   Z,  Z,   Z],
                    [Z, M11,   Z,  Z,   Z],
@@ -91,15 +113,15 @@ def matrices(N,ell,Ekman,Prandtl,Rayleigh):
                    [Z,   Z,   Z,  Z,   Z],
                    [Z,   Z,   Z,  Z, M44]])
     M = M.tocsr()
-                   
+
     L00 = -Ekman*D(-1,1, 0).dot(D(+1, 0,-1))
     L11 = -Ekman*D(-1,1,+1).dot(D(+1, 0, 0))
     L22 = -Ekman*D(+1,1, 0).dot(D(-1, 0,+1))
     L44 = -D(-1,1,+1).dot(D(+1, 0, 0))
-               
+
     L03 = xim*E(+1,-1).dot(D(-1,0,0))
     L23 = xip*E(+1,+1).dot(D(+1,0,0))
-        
+
     L30 = xim*D(+1,0,-1)
     L32 = xip*D(-1,0,+1)
 
@@ -193,9 +215,11 @@ class StateVector:
                                                                       taus))
 
     def unpack(self,u,p,T):
-        u.layout = 'c'
-        p.layout = 'c'
-        T.layout = 'c'
+        if accelerate_layout:
+            u.layout = 'c'
+            p.layout = 'c'
+            T.layout = 'c'
+
         for ell in range(ell_start,ell_end+1):
             ell_local = ell-ell_start
             end_u = u['c'][ell_local].shape[0]
@@ -212,9 +236,16 @@ comm = MPI.COMM_WORLD
 rank = comm.rank
 size = comm.size
 
+import sys
+import os
+from docopt import docopt
+args = docopt(__doc__)
+
+first_time = time.time()
+
 # Resolution
-L_max = 31
-N_max = 31
+L_max = int(args['--L_max'])
+N_max = int(args['--N_max'])
 R_max = 3
 
 alpha_BC = 0
@@ -223,18 +254,46 @@ L_dealias = 3/2
 N_dealias = 3/2
 N_r = N_max
 
+mesh = args['--mesh']
+if mesh is not None:
+    mesh = mesh.split(',')
+    mesh = [int(mesh[0]), int(mesh[1])]
+else:
+    log2 = np.log2(size)
+    if log2 == int(log2):
+        mesh = [int(2**np.ceil(log2/2)),int(2**np.floor(log2/2))]
+    logger.info("running on processor mesh={}".format(mesh))
+
 # parameters
-Ekman = 3e-4
-Prandtl = 1
-Rayleigh = 95
+Rayleigh = float(args['--Rayleigh'])
+Ekman = float(args['--Ekman'])
+Prandtl = float(args['--Prandtl'])
 S = 3
 
+data_dir = sys.argv[0].split('.py')[0]
+data_dir += '_Ra{}_Ek{}_Pr{}'.format(args['--Rayleigh'],args['--Ekman'],args['--Prandtl'])
+if args['--label'] == None:
+    data_dir += '/'
+else:
+    data_dir += '_{}/'.format(args['--label'])
+
+logger.info(sys.argv)
+logger.info('-'*40)
+logger.info("Run parameters")
+for key in args:
+    logger.info("{} = {}".format(key, args[key]))
+logger.info('-'*40)
+logger.info("Ra = {}, Ek = {}, Pr = {}".format(Rayleigh, Ekman, Prandtl))
+
+if rank == 0:
+    if not os.path.exists('{:s}/'.format(data_dir)):
+        os.mkdir('{:s}/'.format(data_dir))
+
 # Integration parameters
-dt = 8e-5
-t_end = 20
+dt = 1e-5*(95/Rayleigh) #min(1e-5, Ekman/10)
+t_end = float(args['--run_time_diffusion'])
 
 # Make domain
-mesh=[2,2]
 phi_basis = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
 theta_basis = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
 r_basis = de.Fourier('r', N_max+1, interval=(0,1),dealias=N_dealias)
@@ -270,8 +329,18 @@ ell_end   = r_ell_layout.slices(scales=1)[1].stop-1
 N_theta = int((L_max+1)*L_dealias)
 N_r     = int((N_r+1)*N_dealias)
 B = ball.Ball(N_max,L_max,N_theta=N_theta,N_r=N_r,R_max=R_max,ell_min=ell_start,ell_max=ell_end,m_min=m_start,m_max=m_end,a=0.)
+
+# coordinate arrays for plotting
 theta_global = B.grid(0)
 r_global = B.grid(1)
+n_phi_global = 2*(L_max+1)*L_dealias
+phi_global = np.expand_dims(np.linspace(0, 2*np.pi, num=n_phi_global+1, endpoint=True), axis=1)
+r_global = np.pad(r_global, ((0,0),(1,1)), mode='constant', constant_values=(0,1))
+theta_global = np.pad(theta_global, ((1,1), (0,0)), mode='constant', constant_values=(np.pi,0))
+logger.debug(' r: {}\n{}'.format(r_global.shape, r_global[0,:]))
+logger.debug('th: {}\n{}'.format(theta_global.shape, theta_global[0,:]))
+logger.debug('ph: {}\n{}'.format(phi_global.shape, phi_global[0,:]))
+
 z, R = r_global*np.cos(theta_global), r_global*np.sin(theta_global) # global
 
 grid_slices = phi_layout.slices(domain.dealias)
@@ -298,7 +367,8 @@ T['g'] = 0.5*(1-r**2) + 0.1/8.*np.sqrt(35/np.pi)*r**3*(1-r**2)*(np.cos(3*phi)+np
 # build state vector
 state_vector = StateVector(u,p,T)
 NL = StateVector(u,p,T)
-timestepper = timesteppers.SBDF4(StateVector, u,p,T)
+#timestepper = timesteppers.SBDF4(StateVector, u,p,T)
+timestepper = timesteppers.SBDF2(StateVector, u,p,T)
 
 # build matrices
 M,L,P,LU = [],[],[],[]
@@ -316,18 +386,22 @@ def nonlinear(state_vector, RHS, t):
     # get U in coefficient space
     state_vector.unpack(u,p,T)
 
-    DT.layout = 'c'
-    om.layout = 'c'
+    if accelerate_layout:
+        om.layout = 'c'
+        DT.layout = 'c'
+
     # take derivatives
     for ell in range(ell_start,ell_end+1):
         ell_local = ell - ell_start
         B.curl(ell,1,u['c'][ell_local],om['c'][ell_local])
         DT['c'][ell_local] = B.grad(ell,0,T['c'][ell_local])
 
+    if accelerate_layout:
+        u_rhs.layout = 'g'
+        T_rhs.layout = 'g'
+
     # R = ez cross u
     ez = np.array([np.cos(theta),-np.sin(theta),0*np.cos(theta)])
-    u_rhs.layout = 'g'
-    T_rhs.layout = 'g'
     u_rhs['g'] = -B.cross_grid(ez,u['g'])
     u_rhs['g'] += Ekman*B.cross_grid(u['g'],om['g'])
     u_rhs['g'][0] += Rayleigh*r*T['g'][0]
@@ -350,35 +424,84 @@ def nonlinear(state_vector, RHS, t):
 
 reducer = GlobalArrayReducer(domain.dist.comm_cart)
 
-t = 0.
+timing_iter = 10
+if args['--run_time_iter'] is None:
+    iter_end = np.inf
+else:
+    iter_end = int(args['--run_time_iter'])+timing_iter
 
-t_list = []
-E_list = []
+out_cadence = 1000
+report_cadence = 1
 
-# timestepping loop
+def initial_iterations(timing_iter):
+    t = 0.
+    iter = 0
+
+    while iter <= timing_iter:
+            nonlinear(state_vector,NL,t)
+            if iter % report_cadence == 0:
+                E0 = np.sum(weight_r*weight_theta*0.5*u['g']**2)*(np.pi)/((L_max+1)*L_dealias)
+                E0 = reducer.reduce_scalar(E0, MPI.SUM)
+                logger.info("iter: {:d}, dt={:e}, t/t_e={:e}, E0={:}".format(iter, dt, t/t_end, E0))
+
+            timestepper.step(dt, state_vector, B, L, M, P, NL, LU)
+            t += dt
+            iter += 1
+    return iter, t
+
+logger.info("initializing")
+iter, t  = initial_iterations(timing_iter)
+
+logger.info("starting main loop")
 start_time = time.time()
-iter = 0
 
-while t < t_end:
+def main_loop(iter, t):
+    try:
+        # timestepping loop
+        while iter <= iter_end and t <= t_end:
 
-    nonlinear(state_vector,NL,t) 
+            if iter == timing_iter:
+                start_time = time.time()
 
-    if iter % 10 == 0:
-        E0 = np.sum(weight_r*weight_theta*0.5*u['g']**2)*(np.pi)/((L_max+1)*L_dealias)
-        E0 = reducer.reduce_scalar(E0, MPI.SUM)
-        logger.info("iter: {:d}, dt={:e}, t/t_e={:e}, E0={:e}".format(iter, dt, t/t_end,E0))
-        if rank == 0:
-            t_list.append(t)
-            E_list.append(E0)
+            nonlinear(state_vector,NL,t)
+            if iter % report_cadence == 0:
+                E0 = np.sum(weight_r*weight_theta*0.5*u['g']**2)*(np.pi)/((L_max+1)*L_dealias)
+                E0 = reducer.reduce_scalar(E0, MPI.SUM)
+                logger.info("iter: {:d}, dt={:e}, t/t_e={:e}, E0={:}".format(iter, dt, t/t_end, E0))
 
-    timestepper.step(dt, state_vector, B, L, M, P, NL, LU)
-    t += dt
-    iter += 1
+            timestepper.step(dt, state_vector, B, L, M, P, NL, LU)
+            t += dt
+            iter += 1
+    except:
+        logger.info("terminated with error")
+        raise
+    finally:
+        logger.info("terminated normally")
+    return iter, t
+
+iter, t = main_loop(iter, t)
 
 end_time = time.time()
 if rank==0:
-    print('simulation took: %f' %(end_time-start_time))
-    t_list = np.array(t_list)
-    E_list = np.array(E_list)
-    np.savetxt('marti_E_32_tau.dat',np.array([t_list,E_list]))
-
+    n_iter_timing = iter - timing_iter
+    startup_time = start_time - first_time
+    main_loop_time = end_time - start_time
+    logger.info('simulation took: {:.2g} sec'.format(end_time-first_time))
+    logger.info('        startup: {:.2g} sec'.format(startup_time))
+    logger.info('      main loop: {:.2g} sec'.format(main_loop_time))
+    logger.info('       at speed: {:.3g} iter/sec'.format(n_iter_timing/(end_time-start_time)))
+    if n_iter_timing > 0:
+        N_TOTAL_CPU = size
+        print('-' * 40)
+        print('    iterations:', n_iter_timing)
+        print(' loop sec/iter:', main_loop_time/n_iter_timing)
+        print('    average dt:', t/n_iter_timing)
+        print("          N_cores, L_max, N_max, startup     main loop,   main loop/iter, main loop/iter/grid, n_cores*main loop/iter/grid")
+        print('scaling:',
+            ' {:4d} {:4d} {:4d}'.format(N_TOTAL_CPU,L_max,N_max),
+            ' {:8.3g} {:8.3g} {:8.3g} {:8.3g} {:8.3g}'.format(startup_time,
+                                                            main_loop_time,
+                                                            main_loop_time/n_iter_timing,
+                                                            main_loop_time/n_iter_timing/((L_max+1)**2*2*(N_max+1)),
+                                                            N_TOTAL_CPU*main_loop_time/n_iter_timing/((L_max+1)**2*2*(N_max+1))))
+        print('-' * 40)

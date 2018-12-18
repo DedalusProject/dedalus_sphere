@@ -1,5 +1,5 @@
 import numpy             as np
-import jacobi128         as jacobi
+from . import jacobi128         as jacobi
 import scipy.sparse      as sparse
 
 def a_and_b(m,s,dm=None,ds=None):
@@ -38,21 +38,21 @@ def L_min(m,s):
 def quadrature(L_max,**kw):
     """ Generates the Gauss quadrature grid and weights for spherical harmonics transform.
         Returns cos_theta, weights
-        
+
         Parameters
         ----------
         L_max: int
         Will integrate polynomials on (-1,+1) exactly up to degree = 2*L_max+1.
-        
+
     """
-    
+
     return jacobi.quadrature(L_max,0,0,**kw)
 
 def Y(L_max,m,s,cos_theta):
     """
         Gives spin-wieghted spherical harmonic functions on the Gauss quaduature grid.
         Returns an array with shape = ( L_max-L_min(m,s) + 1, len(cos_theta) ).
-        
+
         Parameters
         ----------
         L_max, m,s : int
@@ -63,13 +63,13 @@ def Y(L_max,m,s,cos_theta):
         starting Jacobi parameters
         da,db: int
         increments in (a,b)
-        
+
     """
 
     a, b  = a_and_b(m,s)
     N     = L_max - L_min(m,s)
     phase = (-1)**max(m,-s)
-    
+
     init  = phase*jacobi.envelope(a,b,0,0,cos_theta)
 
     return jacobi.recursion(N,a,b,cos_theta,init)
@@ -78,16 +78,16 @@ def unitary(rank=1,adjoint=False):
     """ Transforms the components of vectors and tensors.
         U:        (v[th],v[ph]) --> (v[+],v[-])
         Uadjoint: (v[+],v[-])   --> (v[th],v[ph])
-        
+
         Parameters
         ----------
         rank: int
         rank=1 for vectors, rank=2 for matrices, etc
         adjoint: T/F
         returns the inverse transformation
-        
+
     """
-    
+
     if rank == 0: return 1
 
     if adjoint :
@@ -102,7 +102,7 @@ def unitary(rank=1,adjoint=False):
 
 def operator(op,L_max,m,s):
     """ Various derivative and multiplication operators for spin-weighted spherical harmonics .
-    
+
         Parameters
         ----------
         L_max, m, s: int
@@ -114,9 +114,9 @@ def operator(op,L_max,m,s):
         C  = Cosine multiplication with (m,s) -> (m,s);   couples ell
         S+ = Sine multiplication   with (m,s) -> (m,s+1); couples ell
         S- = Sine multiplication   with (m,s) -> (m,s-1); couples ell
-        
+
     """
-    
+
     def ds(op):
         """get s increment from the operator string"""
         if len(op)==1: return 0

@@ -1,5 +1,5 @@
-import ball_wrapper as ball
-import ball128
+from dedalus_sphere import ball_wrapper as ball
+from dedalus_sphere import ball128
 import numpy as np
 from   scipy.linalg      import eig
 from scipy.sparse        import linalg as spla
@@ -12,7 +12,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import time
-import timesteppers
+from dedalus_sphere import timesteppers
 
 # Gives LHS matrices for hydro.
 
@@ -23,35 +23,35 @@ def BC_rows(N):
     return N0,N1,N2
 
 def matrices(N,ell,Ekman):
-    
+
     nu = Ekman
-    
+
     def D(mu,i,deg):
         if mu == +1: return B.op('D+',N,i,ell+deg)
         if mu == -1: return B.op('D-',N,i,ell+deg)
-    
+
     def E(i,deg): return B.op('E',N,i,ell+deg)
-   
+
     def C(deg): return ball128.connection(N,ell+deg,alpha_BC,2)
- 
+
     Z = B.op('0',N,0,ell)
-    
+
     N0 = N
     N1 = N + N0 + 1
     N2 = N + N1 + 1
     N3 = N + N2 + 1
-    
+
     if ell == 0: #+3 is for tau rows
         M = B.op('0',N3+3,0,ell).tocsr()
         L = B.op('I',N3+3,0,ell).tocsr()
         return M, L
-    
+
     xim, xip = B.xi([-1,+1],ell)
-    
+
     M00 = E(1,-1).dot(E( 0,-1))
     M11 = E(1, 0).dot(E( 0, 0))
     M22 = E(1,+1).dot(E( 0,+1))
-    
+
     M=sparse.bmat([[M00, Z,   Z,  Z],
                    [Z, M11,   Z,  Z],
                    [Z,   Z, M22,  Z],
@@ -60,17 +60,17 @@ def matrices(N,ell,Ekman):
     #M[N0]=np.zeros(N3+1) # for boundary conditions
     #M[N1]=np.zeros(N3+1)
     #M[N2]=np.zeros(N3+1)
-                   
+
     L00 = -nu*D(-1,1, 0).dot(D(+1, 0,-1))
     L11 = -nu*D(-1,1,+1).dot(D(+1, 0, 0))
     L22 = -nu*D(+1,1, 0).dot(D(-1, 0,+1))
-                   
+
     L03 = xim*E(+1,-1).dot(D(-1,0,0))
     L23 = xip*E(+1,+1).dot(D(+1,0,0))
-        
+
     L30 = xim*D(+1,0,-1)
     L32 = xip*D(-1,0,+1)
-                   
+
     L=sparse.bmat([[L00,  Z,   Z, L03],
                    [Z,  L11,   Z,   Z],
                    [Z,    Z, L22, L23],
@@ -97,7 +97,7 @@ def matrices(N,ell,Ekman):
                      [row0,    0 ,   0,    0],
                      [row1,    0 ,   0,    0],
                      [row2,    0,    0,    0]])
-    
+
     M = sparse.bmat([[     M, 0*col0, 0*col1, 0*col2],
                      [0*row0,      0 ,     0,      0],
                      [0*row1,      0 ,     0,      0],
@@ -165,7 +165,7 @@ dt = 0.02
 t_end = 40
 
 # Make domain
-mesh=None
+mesh=[2,2]
 phi_basis = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
 theta_basis = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
 r_basis = de.Fourier('r', N_r+1, interval=(0,1),dealias=N_dealias)
@@ -326,13 +326,13 @@ iter = 0
 while t < t_end:
 
     nonlinear(state_vector, NL, t)
-    
+
     if iter % 10 == 0:
         ur_grid, uth_grid, uph_grid, p_grid = backward_state(state_vector)
         if rank == 0:
             E0 = np.sum(weight_r*weight_theta*(ur_grid**2+uth_grid**2+uph_grid**2) )
             E0 = 0.5*E0*(np.pi)/(L_max+1)/L_dealias
-            
+
             print(t,E0)
             t_list.append(t)
             E_list.append(E0)
@@ -349,4 +349,3 @@ if rank==0:
     t_list = np.array(t_list)
     E_list = np.array(E_list)
     np.savetxt('marti_E.dat',np.array([t_list,E_list]))
-

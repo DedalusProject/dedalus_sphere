@@ -66,7 +66,7 @@ if calculate:
   print(vals)
   print(vals_analytic)
   print("Rossby eigenvalues took {:g} sec".format(rossby_end-rossby_start))
-  
+
 vals = np.load('data/rossby.npy')
 vals_analytic = np.load('data/rossby_analytic.npy')
 
