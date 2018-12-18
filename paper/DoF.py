@@ -1,6 +1,7 @@
 
+# Calculates degrees of in a simulation
+
 L_max = 63
-#M_max = 8
 M_max = L_max
 N_max = 31
 R_max = 3

@@ -1,5 +1,6 @@
 from dedalus_sphere import ball_wrapper as ball
 from dedalus_sphere import ball128
+from dedalus_sphere import timesteppers
 import numpy as np
 from   scipy.linalg      import eig
 from scipy.sparse        import linalg as spla
@@ -12,7 +13,10 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import time
-from dedalus_sphere import timesteppers
+import pickle
+
+import logging
+logger = logging.getLogger(__name__)
 
 # Gives LHS matrices for hydro.
 
@@ -23,54 +27,51 @@ def BC_rows(N):
     return N0,N1,N2
 
 def matrices(N,ell,Ekman):
-
+    
     nu = Ekman
-
+    
     def D(mu,i,deg):
         if mu == +1: return B.op('D+',N,i,ell+deg)
         if mu == -1: return B.op('D-',N,i,ell+deg)
-
+    
     def E(i,deg): return B.op('E',N,i,ell+deg)
-
+   
     def C(deg): return ball128.connection(N,ell+deg,alpha_BC,2)
-
+ 
     Z = B.op('0',N,0,ell)
-
+    
     N0 = N
     N1 = N + N0 + 1
     N2 = N + N1 + 1
     N3 = N + N2 + 1
-
+    
     if ell == 0: #+3 is for tau rows
         M = B.op('0',N3+3,0,ell).tocsr()
         L = B.op('I',N3+3,0,ell).tocsr()
         return M, L
-
+    
     xim, xip = B.xi([-1,+1],ell)
-
+    
     M00 = E(1,-1).dot(E( 0,-1))
     M11 = E(1, 0).dot(E( 0, 0))
     M22 = E(1,+1).dot(E( 0,+1))
-
+    
     M=sparse.bmat([[M00, Z,   Z,  Z],
                    [Z, M11,   Z,  Z],
                    [Z,   Z, M22,  Z],
                    [Z,   Z,   Z,  Z]])
     M = M.tocsr()
-    #M[N0]=np.zeros(N3+1) # for boundary conditions
-    #M[N1]=np.zeros(N3+1)
-    #M[N2]=np.zeros(N3+1)
-
+                   
     L00 = -nu*D(-1,1, 0).dot(D(+1, 0,-1))
     L11 = -nu*D(-1,1,+1).dot(D(+1, 0, 0))
     L22 = -nu*D(+1,1, 0).dot(D(-1, 0,+1))
-
+                   
     L03 = xim*E(+1,-1).dot(D(-1,0,0))
     L23 = xip*E(+1,+1).dot(D(+1,0,0))
-
+        
     L30 = xim*D(+1,0,-1)
     L32 = xip*D(-1,0,+1)
-
+                   
     L=sparse.bmat([[L00,  Z,   Z, L03],
                    [Z,  L11,   Z,   Z],
                    [Z,    Z, L22, L23],
@@ -97,7 +98,7 @@ def matrices(N,ell,Ekman):
                      [row0,    0 ,   0,    0],
                      [row1,    0 ,   0,    0],
                      [row2,    0,    0,    0]])
-
+    
     M = sparse.bmat([[     M, 0*col0, 0*col1, 0*col2],
                      [0*row0,      0 ,     0,      0],
                      [0*row1,      0 ,     0,      0],
@@ -129,6 +130,8 @@ class StateVector:
                                                                       p['c'][ell_local][:,m_local],BCs_m))
 
     def unpack(self,u,p):
+        u.layout = 'c'
+        p.layout = 'c'
         for ell in range(ell_start,ell_end+1):
             ell_local = ell-ell_start
             end_u = u['c'][ell_local].shape[0]
@@ -145,8 +148,8 @@ rank = comm.rank
 size = comm.size
 
 # Resolution
-L_max = 15
-N_max = 15
+L_max = 31
+N_max = 31
 R_max = 3
 
 alpha_BC = 0
@@ -165,7 +168,7 @@ dt = 0.02
 t_end = 40
 
 # Make domain
-mesh=[2,2]
+mesh=[4,4]
 phi_basis = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
 theta_basis = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
 r_basis = de.Fourier('r', N_r+1, interval=(0,1),dealias=N_dealias)
@@ -260,16 +263,17 @@ def nonlinear(state_vector, NL, t):
     state_vector.unpack(u,p)
 
     # take derivatives
+    Du.layout = 'c'
     for ell in range(ell_start,ell_end+1):
         ell_local = ell - ell_start
         Du['c'][ell_local] = B.grad(ell,1,u['c'][ell_local])
 
     # R = ez cross u
+    u_rhs.layout = 'g'
     ez = np.array([np.cos(theta),-np.sin(theta),0*np.cos(theta)])
     u_rhs['g'] = -Om*B.cross_grid(ez,u['g'])
     for i in range(3):
         u_rhs['g'][i] -= u['g'][0]*Du['g'][i] + u['g'][1]*Du['g'][3*1+i] + u['g'][2]*Du['g'][3*2+i]
-    p_rhs['g'] = 0.
 
     # transform (ell, r) -> (ell, N)
     for ell in range(ell_start, ell_end+1):
@@ -326,14 +330,14 @@ iter = 0
 while t < t_end:
 
     nonlinear(state_vector, NL, t)
-
+    
     if iter % 10 == 0:
         ur_grid, uth_grid, uph_grid, p_grid = backward_state(state_vector)
         if rank == 0:
             E0 = np.sum(weight_r*weight_theta*(ur_grid**2+uth_grid**2+uph_grid**2) )
             E0 = 0.5*E0*(np.pi)/(L_max+1)/L_dealias
-
-            print(t,E0)
+            
+            logger.info("t = %f, E = %f" %(t,E0))
             t_list.append(t)
             E_list.append(E0)
 
@@ -344,8 +348,97 @@ while t < t_end:
 
 end_time = time.time()
 
+logger.info("simulation took: %f" %(end_time-start_time))
+
 if rank==0:
-    print('simulation took: %f' %(end_time-start_time))
     t_list = np.array(t_list)
     E_list = np.array(E_list)
     np.savetxt('marti_E.dat',np.array([t_list,E_list]))
+
+output_final_state = False
+if output_final_state: # introduce large dealiasing factor to output high res image
+
+    u.require_coeff_space()
+    
+    L_dealias = 8
+    N_dealias = 8
+    
+    # Make domain
+    phi_basis2 = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
+    theta_basis2 = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
+    r_basis2 = de.Fourier('r', N_r+1, interval=(0,1),dealias=N_dealias)
+    domain2 = de.Domain([phi_basis2,theta_basis2,r_basis2], grid_dtype=np.float64, mesh=mesh)
+    
+    domain2.global_coeff_shape = np.array([L_max+1,L_max+1,N_max+1])
+    domain2.distributor = Distributor(domain2,comm,mesh)
+    
+    mesh = domain2.distributor.mesh
+    if len(mesh) == 0:
+        phi_layout2   = domain2.distributor.layouts[3]
+        th_m_layout2  = domain2.distributor.layouts[2]
+        ell_r_layout2 = domain2.distributor.layouts[1]
+        r_ell_layout2 = domain2.distributor.layouts[1]
+    elif len(mesh) == 1:
+        phi_layout2   = domain2.distributor.layouts[4]
+        th_m_layout2  = domain2.distributor.layouts[2]
+        ell_r_layout2 = domain2.distributor.layouts[1]
+        r_ell_layout2 = domain2.distributor.layouts[1]
+    elif len(mesh) == 2:
+        phi_layout2   = domain2.distributor.layouts[5]
+        th_m_layout2  = domain2.distributor.layouts[3]
+        ell_r_layout2 = domain2.distributor.layouts[2]
+        r_ell_layout2 = domain2.distributor.layouts[1]
+    
+    m_start   = th_m_layout2.slices(scales=1)[0].start
+    m_end     = th_m_layout2.slices(scales=1)[0].stop-1
+    m_size = m_end - m_start + 1
+    ell_start = r_ell_layout2.slices(scales=1)[1].start
+    ell_end   = r_ell_layout2.slices(scales=1)[1].stop-1
+    
+    # set up ball
+    N_theta = int((L_max+1)*L_dealias)
+    N_r     = int((N_r+1)*N_dealias)
+    B2 = ball.Ball(N_max,L_max,N_theta=N_theta,N_r=N_r,R_max=R_max,ell_min=ell_start,ell_max=ell_end,m_min=m_start,m_max=m_end,a=0.)
+    theta_global = B2.grid(0)
+    r_global = B2.grid(1)
+    phi_global = domain.grid(0,scales=domain2.dealias)
+    
+    u2 = ball.TensorField_3D(1,B2,domain2)
+    for ell in range(ell_start, ell_end+1):
+        ell_local = ell - ell_start
+        u2['c'][ell_local] = u['c'][ell_local]
+    
+    def backward_state2():
+    
+        ur_global  = comm.gather(u2['g'][0], root=0)
+        uth_global = comm.gather(u2['g'][1], root=0)
+        uph_global = comm.gather(u2['g'][2], root=0)
+    
+        starts = comm.gather(phi_layout2.start(scales=domain2.dealias),root=0)
+        counts = comm.gather(phi_layout2.local_shape(scales=domain2.dealias),root=0)
+    
+        if rank == 0:
+            ur_full  = np.zeros(phi_layout2.global_shape(scales=domain2.dealias))
+            uth_full = np.zeros(phi_layout2.global_shape(scales=domain2.dealias))
+            uph_full = np.zeros(phi_layout2.global_shape(scales=domain2.dealias))
+            for i in range(size):
+                spatial_slices = tuple(slice(s, s+c) for (s,c) in zip(starts[i], counts[i]))
+                ur_full[spatial_slices]  = ur_global[i]
+                uth_full[spatial_slices] = uth_global[i]
+                uph_full[spatial_slices] = uph_global[i]
+        else:
+            ur_full  = None
+            uth_full = None
+            uph_full = None
+    
+        return ur_full,uth_full,uph_full
+    
+    
+    ur_grid, uth_grid, uph_grid = backward_state2()
+    
+    if rank==0:
+        ur_mid = (ur_grid[:,theta_len/2-1] + ur_grid[:,theta_len/2])/2
+        uphi_mid = (uphi_grid[:,theta_len/2-1] + uphi_grid[:,theta_len/2])/2
+        data = {'ur':ur_mid,'uph':uphi_mid,'r':r_global,'phi':phi_global}
+        pickle.dump(data,open('marti_hydro_mid.pkl','wb'))
+
