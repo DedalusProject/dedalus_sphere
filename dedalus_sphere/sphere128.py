@@ -65,10 +65,9 @@ def Y(L_max,m,s,cos_theta):
         increments in (a,b)
 
     """
-
     a, b  = a_and_b(m,s)
     N     = L_max - L_min(m,s)
-    phase = (-1)**max(m,-s)
+    phase = (-1)**int(max(m,-s))
 
     init  = phase*jacobi.envelope(a,b,0,0,cos_theta)
 
