@@ -206,3 +206,8 @@ def recurseQ(Q_old,ell,rank):
                     Q[i,j] = Qnorm*(    Q_old[nu,tau]*((deg+1)*delta(mu,0)-k_ang)+S)/(2*deg+1)
     return Q
 
+def Q(ell, order):
+    Q = np.array([[1]])
+    for rank in range(order):
+        Q = recurseQ(Q, ell, rank+1)
+    return Q
