@@ -53,7 +53,7 @@ ell = 50
 vals, r, vec = bessel.eigensystem(N_max,ell,cutoff=np.inf)
 r = r.astype(np.float64)
 
-L_max, N_max, S_max = 63, 2047, 1
+L_max, N_max, R_max = 63, 2047, 1
 
 theta_basis = de.Fourier('theta', 2*L_max+1, interval=(0,np.pi))
 r_basis = de.Fourier('r', N_max+1, interval=(0,1))
@@ -69,7 +69,7 @@ else:
 
 ell_min = r_ell_layout.slices(scales=1)[0].start
 ell_max = r_ell_layout.slices(scales=1)[0].stop-1
-B = ball.Ball(N_max,L_max,S_max=S_max,ell_min=ell_min,ell_max=ell_max)
+B = ball.Ball(N_max,L_max,R_max=R_max,ell_min=ell_min,ell_max=ell_max)
 r = B.grid(1)[0]
 
 m = 0
