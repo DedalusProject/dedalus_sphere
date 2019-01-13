@@ -49,7 +49,7 @@ data = pickle.load(open('data/marti_hydro_mid.pkl','rb'))
 r = data['r']
 phi = data['phi']
 ur = data['ur']
-uphi = data['uph']
+uphi = data['uphi']
 
 phi_shape = phi.shape
 r_shape = r.shape

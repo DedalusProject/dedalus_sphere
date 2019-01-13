@@ -63,38 +63,31 @@ if calculate:
   vals_analytic = -m/(ell*(ell+1))
   np.save('data/rossby_analytic.npy',vals_analytic)
   rossby_end = time.time()
-  print(vals)
-  print(vals_analytic)
   print("Rossby eigenvalues took {:g} sec".format(rossby_end-rossby_start))
 
 vals = np.load('data/rossby.npy')
 vals_analytic = np.load('data/rossby_analytic.npy')
 
 eigs.append(np.abs(vals - vals_analytic)/np.abs(vals_analytic))
-N_bessel_set = [N_max, int(3/2*N_max)]
 
-for N_bessel in N_bessel_set:
-  if calculate:
-    bessel_start = time.time()
-    ell = 50
-    vals, r, vec = bessel.eigensystem(N_bessel,ell,cutoff=np.inf)
-    np.save('data/bessel_{}.npy'.format(N_bessel),np.sqrt(vals))
-    vals_analytic = wavenumbers(ell,N_bessel,"Bessel")
-    np.save('data/bessel_analytic_{}.npy'.format(N_bessel),vals_analytic)
-    bessel_end = time.time()
-    print("Bessel eigenvalues took {:g} sec".format(bessel_end-bessel_start))
-    print("eigenvalues found: analytic {} vs numeric {}".format(vals_analytic.shape, vals.shape))
+if calculate:
+  bessel_start = time.time()
+  ell = 50
+  vals, r, vec = bessel.eigensystem(N_max,ell,cutoff=np.inf)
+  np.save('data/bessel_{}.npy'.format(N_max),np.sqrt(vals))
+  vals_analytic = wavenumbers(ell,N_max,"Bessel")
+  np.save('data/bessel_analytic_{}.npy'.format(N_max),vals_analytic)
+  bessel_end = time.time()
+  print("Bessel eigenvalues took {:g} sec".format(bessel_end-bessel_start))
+  print("eigenvalues found: analytic {} vs numeric {}".format(vals_analytic.shape, vals.shape))
 
-  vals = np.load('data/bessel_{}.npy'.format(N_bessel))
-  vals_analytic = np.load('data/bessel_analytic_{}.npy'.format(N_bessel))
+vals = np.load('data/bessel_{}.npy'.format(N_max))
+vals_analytic = np.load('data/bessel_analytic_{}.npy'.format(N_max))
 
-  eigs.append(np.abs(vals - vals_analytic)/np.abs(vals_analytic))
+eigs.append(np.abs(vals - vals_analytic)/np.abs(vals_analytic))
 
-color=['MidnightBlue', 'MidnightBlue', 'FireBrick']
 for i in range(2):
-  if i == 1:
-    plot_axes[i].semilogy(eigs[i+1],linewidth=2,color=color[i+1])
-  plot_axes[i].semilogy(eigs[i],linewidth=2,color=color[i])
+  plot_axes[i].semilogy(eigs[i],linewidth=2,color='MidnightBlue')
   plot_axes[i].set_ylabel(labels[i])
   plot_axes[i].text(text_x, text_y, text_label[i],
                     horizontalalignment='center',

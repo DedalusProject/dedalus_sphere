@@ -10,7 +10,7 @@ import publication_settings
 
 matplotlib.rcParams.update(publication_settings.params)
 
-t_mar, b_mar, l_mar, r_mar = (0.05, 0.18, 0.27, 0.07)
+t_mar, b_mar, l_mar, r_mar = (0.05, 0.2, 0.27, 0.07)
 h_eig, w_eig = (1,3)
 h_pad = 0.075
 h_error, w_error = (0.25,3)
@@ -32,7 +32,7 @@ eig_axes = fig.add_axes([left,bottom,width,height])
 
 inset_width = 0.2
 inset_height = 0.25
-inset_left = 0.78
+inset_left = 0.77
 inset_bottom = 0.7
 
 left = left + width*inset_left
@@ -87,15 +87,16 @@ sol /= np.max(np.abs(sol))
 eig_axes.plot(r,f['g'][0,10,:],color='firebrick',linewidth=2,label=r'${\rm numeric}$')
 eig_axes.set_ylabel(r'$f$')
 plt.setp(eig_axes.get_xticklabels(), visible=False)
-eig_axes.set_ylim([-1.2,1.2])
+eig_axes.set_ylim([-1.1,1.4])
+eig_axes.set_xlim([0,1])
 eig_axes.set_yticks([-1.,0,1.])
 
 inset_axes.loglog(r,sol,color='firebrick')
 inset_axes.loglog(r,1e10*sol[0]*(r/r[0])**(ell),color='k',linestyle='--')
-inset_axes.set_xlim([0,0.2])
+inset_axes.set_xlim([0,0.1])
 inset_axes.set_ylim([np.min(sol),1.])
 inset_axes.yaxis.set_major_locator(LogLocator(base=10,numticks=4))
-inset_axes.set_xticks([0.01,0.1,0.2])
+inset_axes.set_xticks([0.01,0.1])
 inset_axes.set_ylabel(r'$f$')
 inset_axes.set_xlabel(r'$r$',labelpad = -1)
 
@@ -109,6 +110,7 @@ error_axes.plot(r,1e13*(sol-f['g'][0,10,:]),color='k',linewidth=2)
 error_axes.set_ylabel(r'${\rm error}\times 10^{13}$')
 error_axes.set_xlabel(r'$r$')
 error_axes.set_yticks([-3.,0,3])
+error_axes.set_xlim([0,1])
 
 plt.savefig('figures/bessel_eigenfunction.eps')
 
