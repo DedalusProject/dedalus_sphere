@@ -168,7 +168,7 @@ dt = 0.02
 t_end = 40
 
 # Make domain
-mesh=[4,4]
+mesh=[2,2]
 phi_basis = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
 theta_basis = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
 r_basis = de.Fourier('r', N_r+1, interval=(0,1),dealias=N_dealias)
@@ -355,7 +355,7 @@ if rank==0:
     E_list = np.array(E_list)
     np.savetxt('marti_E.dat',np.array([t_list,E_list]))
 
-output_final_state = False
+output_final_state = True
 if output_final_state: # introduce large dealiasing factor to output high res image
 
     u.require_coeff_space()
@@ -437,8 +437,8 @@ if output_final_state: # introduce large dealiasing factor to output high res im
     ur_grid, uth_grid, uph_grid = backward_state2()
     
     if rank==0:
-        ur_mid = (ur_grid[:,theta_len/2-1] + ur_grid[:,theta_len/2])/2
-        uphi_mid = (uphi_grid[:,theta_len/2-1] + uphi_grid[:,theta_len/2])/2
+        ur_mid = (ur_grid[:,N_theta/2-1] + ur_grid[:,theta_len/2])/2
+        uphi_mid = (uphi_grid[:,N_theta/2-1] + uphi_grid[:,theta_len/2])/2
         data = {'ur':ur_mid,'uph':uphi_mid,'r':r_global,'phi':phi_global}
         pickle.dump(data,open('marti_hydro_mid.pkl','wb'))
 
