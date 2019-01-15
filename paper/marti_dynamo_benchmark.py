@@ -287,7 +287,6 @@ t_end = 10
 
 # Make domain
 mesh = [6,6]
-#mesh = None
 phi_basis = de.Fourier('phi',2*(L_max+1), interval=(0,2*np.pi),dealias=L_dealias)
 theta_basis = de.Fourier('theta', L_max+1, interval=(0,np.pi),dealias=L_dealias)
 r_basis = de.Fourier('r', N_r+1, interval=(0,1),dealias=N_dealias)

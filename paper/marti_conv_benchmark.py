@@ -363,7 +363,6 @@ while t < t_end:
 
     nonlinear(state_vector,NL,t)
 
-
     if iter % 10 == 0:
         E0 = np.sum(weight_r*weight_theta*0.5*u['g']**2)*(np.pi)/((L_max+1)*L_dealias)
         E0 = reducer.reduce_scalar(E0, MPI.SUM)
@@ -381,5 +380,5 @@ if rank==0:
     print('simulation took: %f' %(end_time-start_time))
     t_list = np.array(t_list)
     E_list = np.array(E_list)
-    np.savetxt('marti_E_32_tau.dat',np.array([t_list,E_list]))
+    np.savetxt('marti_conv.dat',np.array([t_list,E_list]))
 
