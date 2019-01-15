@@ -380,5 +380,5 @@ if rank==0:
     print('simulation took: %f' %(end_time-start_time))
     t_list = np.array(t_list)
     E_list = np.array(E_list)
-    np.savetxt('marti_E_32_tau.dat',np.array([t_list,E_list]))
+    np.savetxt('marti_conv.dat',np.array([t_list,E_list]))
 
