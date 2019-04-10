@@ -1,6 +1,6 @@
 
 import numpy     as np
-import disk128 as disk
+from . import disk128 as disk
 from scipy.sparse import linalg as spla
 from dedalus.tools.cache import CachedMethod
 
@@ -29,7 +29,7 @@ class Disk:
 
         Q0           = disk.polynomial(self.N_r-1,0,0,z0)
         Q_projection = disk.polynomial(self.N_r-1,0,0,self.grid)
-        
+
         self.dV = ((Q0.dot(weights0)).T).dot(self.weights*Q_projection)/4
 
         # downcast to double precision
@@ -143,7 +143,7 @@ class Disk:
                                     [0,-1.j, 2.j,-1.j],
                                     [0, 1.j,   0,-1.j],
                                     [0, 1. ,   0,-1.]])
-        else: 
+        else:
             unitary = self.unitary(rank=rank,adjoint=False)
 
         shape = np.array(np.array(data).shape)
