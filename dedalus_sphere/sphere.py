@@ -12,7 +12,7 @@ def quadrature(Lmax,**kw):
     return jacobi.quadrature(Lmax,0,0,**kw)
 
 
-def Y(m,s,cos_theta):
+def Y(Lmax,m,s,cos_theta):
     """
         Gives spin-wieghted spherical harmonic functions on the Gauss quaduature grid.
         Returns an array with shape = ( Lmax - Lmin(m,s) + 1, len(z) ).
@@ -30,7 +30,7 @@ def Y(m,s,cos_theta):
         
         """
     
-    a, b, N = _spin2Jacobi(m,s)
+    a, b, N = _spin2Jacobi(Lmax,m,s)
     
     init    = ((-1)**max(m,-s))*jacobi.envelope(a,b,0,0,cos_theta)
     
