@@ -114,11 +114,10 @@ def gauss_quadrature(Jacobi_matrix,mass=1,niter=3,guess=None,report_error=False,
         P, D = _remainders(Jacobi_matrix,z)
         if report_error: print(np.max(np.abs(P/D)))
         z -= P/D
-
-    w = 1/((1-z**2)*D**2)
-    w *= mass/np.sum(w)
     
     if weights:
+        w = 1/((1-z**2)*D**2)
+        w *= mass/np.sum(w)
         return z, w
 
     return z
