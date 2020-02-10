@@ -32,7 +32,7 @@ def Y(Lmax,m,s,cos_theta):
     
     a, b, N = _spin2Jacobi(Lmax,m,s)
     
-    init    = ((-1)**max(m,-s))*jacobi.envelope(a,b,0,0,cos_theta)
+    init    = ((-1.)**max(m,-s))*jacobi.envelope(a,b,0,0,cos_theta)
     
     return jacobi.recursion(N,a,b,cos_theta,init)
 
