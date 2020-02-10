@@ -13,7 +13,7 @@ def quadrature(dimension,Nmax,alpha=alpha,**kw):
 
 def trial_functions(dimension,Nmax,ell,degree,z,alpha=alpha):
     
-    a, b, N = _regularity2Jacobi(dimension,Nmax,0,ell,degree,dimension,alpha=alpha)
+    a, b, N = _regularity2Jacobi(dimension,Nmax,0,ell,degree,alpha=alpha)
     
     init = jacobi.envelope(a,b,a,dimension/2-1,z)
     return jacobi.recursion(N,a,b,z,init)

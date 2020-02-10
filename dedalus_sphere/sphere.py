@@ -37,7 +37,7 @@ def Y(Lmax,m,s,cos_theta):
     return jacobi.recursion(N,a,b,cos_theta,init)
 
 
-def operator(op,m,s,radius=1):
+def operator(Lmax,op,m,s,radius=1):
     """
         Various derivative and multiplication operators for spin-weighted spherical harmonics .
         
@@ -57,7 +57,7 @@ def operator(op,m,s,radius=1):
     if op in ['k-','k+','S-','S+']:
     
         ds             = int(op[1]+'1')
-        a, b, da,db, N = _spin2Jacobi(m,s,ds=ds)
+        a, b, da,db, N = _spin2Jacobi(Lmax,m,s,ds=ds)
         rescale        = -ds*np.sqrt(0.5)/radius
     
         # derivatives
@@ -91,7 +91,7 @@ def operator(op,m,s,radius=1):
                 return (B @ A)[:-1,:-2]
 
 
-    a, b, N = _spin2Jacobi(m,s)
+    a, b, N = _spin2Jacobi(Lmax,m,s)
 
     # identity
     if op == 'I': return jacobi.operator('I',N,a,b)

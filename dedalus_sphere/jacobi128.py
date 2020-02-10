@@ -87,7 +87,7 @@ def _remainders(Jacobi_matrix,grid):
 
     return (z*P[N-1] - J[0,N-2]*P[N-2]), (z*D[N-1] - J[0,N-2]*D[N-2] + P[N-1])
 
-def gauss_quadrature(Jacobi_matrix,mass=1,niter=3,guess=None,report_error=False):
+def gauss_quadrature(Jacobi_matrix,mass=1,niter=3,guess=None,report_error=False,weights=True):
     """Returns accurate grid and weights for general Gauss quadrature.
     
        Parameters
@@ -118,7 +118,10 @@ def gauss_quadrature(Jacobi_matrix,mass=1,niter=3,guess=None,report_error=False)
     w = 1/((1-z**2)*D**2)
     w *= mass/np.sum(w)
     
-    return z, w
+    if weights:
+        return z, w
+
+    return z
 
 def three_term_recursion(Jacobi_matrix,grid,max_degree,init):
     """Returns weighted orthogonal polynomials on a grid from a three-term recursion.
