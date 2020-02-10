@@ -1,5 +1,5 @@
 import numpy             as np
-import jacobi128         as jacobi
+from . import jacobi128  as jacobi
 import scipy.sparse      as sparse
 
 
