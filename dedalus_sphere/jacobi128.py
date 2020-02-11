@@ -78,6 +78,7 @@ def _remainders(Jacobi_matrix,grid):
             zJ = (z-J[1,n-1])
             P[n] = (zJ*P[n-1] - J[0,n-2]*P[n-2])/J[-1,n]
             D[n] = (zJ*D[n-1] - J[0,n-2]*D[n-2])/J[-1,n] + P[n-1]/J[-1,n]
+        zJ = (z-J[1,N-1])
         return (zJ*P[N-1] - J[0,N-2]*P[N-2]), (zJ*D[N-1] - J[0,N-2]*D[N-2]+P[N-1])
      
     P[1]  = z*P[0]/J[-1,1]
