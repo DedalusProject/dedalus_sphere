@@ -67,3 +67,31 @@ def regularity2spinMap(ell,spin,regularity):
     if a == +1: return (Qold*(degree+1) + R)/np.sqrt((degree+1)*(2*degree+1))
 
 def spin2regularityMap(ell,regularity,spin): return regularity2spinMap(ell,regularity,spin)
+
+def tuple2index(tup,order=(-1,0,1)):
+    index = 0
+    for p,e in enumerate(tup[::-1]): index += (order[e+1]+1)*3**p
+    return index
+
+def index2tuple(index,rank,order=(-1,0,1)):
+    
+    tup = []
+    while index > 0:
+        
+        tup = [order[index%3]] + tup
+        index //= 3
+    
+    r = len(tup)
+    if r < rank:
+        tup = (rank-r)*[order[0]] + tup
+    
+    if r > rank: raise ValueError('rank smaller than tuple length.')
+    
+    return tuple(tup)
+
+
+
+
+
+
+
