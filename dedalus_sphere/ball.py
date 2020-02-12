@@ -19,7 +19,7 @@ def trial_functions(dimension,Nmax,ell,degree,z,alpha=alpha):
     return jacobi.recursion(N,a,b,z,init)
 
 
-def operator(dimension,op,k,ell,degree,radius=1,pad=0,alpha=alpha):
+def operator(dimension,op,Nmax,k,ell,degree,radius=1,pad=0,alpha=alpha):
     
     # derivatives, r multiplication
     if op in ['D-','D+','R-','R+']:
@@ -65,3 +65,111 @@ def _regularity2Jacobi(dimension,Nmax,k,ell,degree,ddeg=None,alpha=alpha):
     dn = max((ell + degree)//2,0) - max((ell + degree + ddeg)//2,0)
     
     return a, b, n, dn
+
+def zeros(Nmax, ell, deg_out, deg_in):
+
+    N1 = Nmax - max((ell + deg_out)//2,0)
+    N2 = Nmax - max((ell + deg_in) //2,0)
+    return np.zeros((N1,N2),dtype=np.complex256)
+
+def xi(mu,ell):
+    """
+        Normalised derivative scale factors. xi(-1,ell)**2 + xi(+1,ell)**2 = 1.
+
+        Parameters
+        ----------
+        mu  : int
+        ball spin parameter. Must be -1,+1,0. xi(0,l) = 0 by definition.
+        ell : int
+        spherical harmonic degree.
+
+        """
+    if mu == [-1,+1]: return xi(-1,ell), xi(+1,ell)
+    if mu == [+1,-1]: return xi(+1,ell), xi(-1,ell)
+    if mu == -1: return np.sqrt(ell/(2*ell+1))
+    if mu == +1: return np.sqrt((ell+1)/(2*ell+1))
+    return 0
+
+def k(mu,ell,s):
+    """
+        Angular deravitive scale factors.
+
+        Parameters
+        ----------
+        mu  : int
+        ball spin parameter. Must be -1,+1,0. k(0,l,s) = 0 by definition.
+        ell : int
+        spherical harmonic degree.
+        s   : int
+        total spin weight
+
+        """
+    if (ell < mu*s) or (ell < -mu*s - 1): return np.inf
+    return -mu*np.sqrt((ell-mu*s)*(ell+mu*s+1)/2)
+
+def spins(rank):
+    spin = np.zeros(3**rank)
+    for i in range(3**rank):
+        spin[i] = bar(i,rank)
+    return spin
+
+def Q_normalization(ell,mu):
+    # returns the normalization of the Q matrix for ell > 0 or ell = 0 and mu = +1
+    # otherwise returns None
+    if ell > 0:
+        if mu == 0:
+            return np.sqrt( (ell+1)/ell )
+        else:
+            return 1/xi(mu,ell)
+    elif ell == 0 and mu == 1:
+        return 1.
+    return None
+
+def delta(mu,nu):
+    if mu == nu: return 1.
+    return 0.
+
+def get_element(nu,element_rank):
+    nu = nu // 3**(element_rank)
+    return (nu % 3) - 1
+
+def bar(mu,rank):
+    mubar = 0
+    for i in range(rank): mubar += get_element(mu,i)
+    return mubar
+
+def replace_index(nu,nup,i):
+    """ nu_{i} -> nup """
+    nui = get_element(nu,i)
+    nu -= (nui+1)*(3**i)
+    return nu + (nup+1)*(3**i)
+
+def R(tau,mu,nu,Q,rank):
+    R = 0
+    if (rank == 0) or (mu == 0):
+        return R
+    for i in range(rank):
+        nui = get_element(nu,i)
+        if (nui == +1 and mu == -1 ) or (nui == -1 and mu == +1 ) : R -= Q[replace_index(nu,0,i),tau]
+        elif (nui == 0 and mu == -1 ): R += Q[replace_index(nu,-1,i),tau]
+        elif (nui == 0 and mu == +1 ): R += Q[replace_index(nu,+1,i),tau]
+    return R
+
+def recurseQ(Q_old,ell,rank):
+    Q = np.zeros((3**rank,3**rank))
+    for i in range(3**rank):
+        for j in range(3**rank):
+            mu,    nu  = (i//(3**(rank-1)))-1, i%(3**(rank-1))
+            sigma, tau = (j//(3**(rank-1)))-1, j%(3**(rank-1))
+            nubar      = bar(nu,rank-1)
+            deg, k_ang = ell+bar(tau,rank-1), k(mu,ell,nubar)
+            Qnorm      = Q_normalization(deg,sigma)
+            S          = R(tau,mu,nu,Q_old,rank-1)
+            if Qnorm and (k_ang != np.inf):
+                if   sigma == -1:
+                    Q[i,j] = Qnorm*(    Q_old[nu,tau]*((deg  )*delta(mu,0)+k_ang)-S)/(2*deg+1)
+                elif sigma == 0:
+                    Q[i,j] = Qnorm*(-mu*Q_old[nu,tau]*k_ang + mu*S )/(deg+1)
+                elif sigma == 1:
+                    Q[i,j] = Qnorm*(    Q_old[nu,tau]*((deg+1)*delta(mu,0)-k_ang)+S)/(2*deg+1)
+    return Q
