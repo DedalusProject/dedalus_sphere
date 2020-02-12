@@ -1,6 +1,5 @@
-from dedalus_sphere import ball_wrapper      as ball
-import dedalus.public    as de
 import ball_bessel       as bessel
+from dedalus_sphere import ball
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker   import LogLocator
@@ -50,41 +49,25 @@ error_axes = fig.add_axes([left,bottom,width,height])
 
 N_max = 511
 ell = 50
-vals, r, vec = bessel.eigensystem(N_max,ell,cutoff=np.inf)
-r = r.astype(np.float64)
-
-L_max, N_max, R_max = 63, 2047, 1
-
-theta_basis = de.Fourier('theta', 2*L_max+1, interval=(0,np.pi))
-r_basis = de.Fourier('r', N_max+1, interval=(0,1))
-domain = de.Domain([theta_basis,r_basis], grid_dtype=np.float64)
-
-mesh = domain.distributor.mesh
-if len(mesh) == 0: #serial
-    ell_r_layout = domain.distributor.layouts[1]
-    r_ell_layout = domain.distributor.layouts[1]
-else:
-    ell_r_layout = domain.distributor.layouts[2]
-    r_ell_layout = domain.distributor.layouts[1]
-
-ell_min = r_ell_layout.slices(scales=1)[0].start
-ell_max = r_ell_layout.slices(scales=1)[0].stop-1
-B = ball.Ball(N_max,L_max,R_max=R_max,ell_min=ell_min,ell_max=ell_max)
-r = B.grid(1)[0]
-
-m = 0
 eig_num = 100
-f = ball.TensorField_2D(0,m,B,domain)
-f['c'][ell][:512] = vec[eig_num]
-f['g'][0,10,:] = f['g'][0,10,:].real
-f['g'][0,10,:] /= np.max(np.abs(f['g'][0,10,:]))
-print(np.max(np.abs(f['g'][0,10,:])))
+
+vals, r, vec = bessel.eigensystem(N_max,ell,cutoff=np.inf)
+
+z, w = ball.quadrature(3, 2047, niter=3)
+r = np.sqrt((z + 1)/2).astype(np.float64)
+
+Q = ball.trial_functions(3, N_max, ell, 0, z)
+print(Q.shape)
+f = (Q.T) @ vec[eig_num]
+f = f.real
+f /= np.max(np.abs(f))
 
 k = np.sqrt(vals[eig_num])
 sol = spec.jv(ell+1/2,k*r)/np.sqrt(k*r)
 sol /= np.max(np.abs(sol))
 
-eig_axes.plot(r,f['g'][0,10,:],color='firebrick',linewidth=2,label=r'${\rm numeric}$')
+print(f.shape)
+eig_axes.plot(r,f,color='firebrick',linewidth=2,label=r'${\rm numeric}$')
 eig_axes.set_ylabel(r'$f$')
 plt.setp(eig_axes.get_xticklabels(), visible=False)
 eig_axes.set_ylim([-1.1,1.4])
@@ -106,12 +89,12 @@ inset_axes.annotate(
               fontsize=12,
               textcoords='offset points')
 
-error_axes.plot(r,1e13*(sol-f['g'][0,10,:]),color='k',linewidth=2)
+error_axes.plot(r,1e13*(sol-f),color='k',linewidth=2)
 error_axes.set_ylabel(r'${\rm error}\times 10^{13}$')
 error_axes.set_xlabel(r'$r$')
 error_axes.set_yticks([-3.,0,3])
 error_axes.set_xlim([0,1])
 
-plt.savefig('figures/bessel_eigenfunction.eps')
+plt.savefig('figures/bessel_eigenfunction.png')
 
 

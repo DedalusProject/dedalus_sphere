@@ -1,38 +1,56 @@
 import numpy as np
-from dedalus_sphere.ball128 import connection
+from dedalus_sphere import ball
+from dedalus_sphere import intertwiner
+from dedalus_sphere.jacobi128 import connection
 from   scipy.linalg      import eig
 import scipy.sparse      as sparse
 import scipy.special     as spec
 
-def BC_rows(N):
-    N0 = N
-    N1 = N + N0 + 1
-    N2 = N + N1 + 1
-    N3 = N + N2 + 1
-    return N0,N1,N2,N3
+def BC_rows(N,ell,deg):
+    N_list = []
+    for d in deg:
+        N_list.append( N - max((ell + d)//2,0) )
+    if len(deg) = 1: return N_list
+    N_list[1:] += 1
+    N_list = np.cumsum(N_list)
+    return N_list
 
-def eigensystem(N,ell,B,alpha_BC,cutoff=1e9,boundary_conditions='no-slip'):
+def eigensystem(N, ell, alpha_BC, cutoff=1e9, boundary_conditions='no-slip'):
 
     if ell == 0: return 0, 0, 0, 0, 0, 0
 
     def D(mu,i,deg):
-        if mu == +1: return B.op('D+',N,i,ell+deg)
-        if mu == -1: return B.op('D-',N,i,ell+deg)
+        if mu == +1: return ball.operator(3,'D+',N,i,ell,deg)
+        if mu == -1: return ball.operator(3,'D-',N,i,ell,deg)
 
-    def E(i,deg): return B.op('E',N,i,ell+deg)
+    def E(i,deg): return ball.operator(3,'E',N,i,ell,deg)
 
-    Z = B.op('0',N,0,ell)
+    def Z(deg_out,deg_in): return ball.zeros(N,ell,deg_out,deg_in)
 
-    xim, xip = B.xi([-1,+1],ell)
+    xim, xip = intertwiner.xi([-1,+1],ell)
 
     R00 = E(1,-1).dot(E( 0,-1))
     R11 = E(1, 0).dot(E( 0, 0))
     R22 = E(1,+1).dot(E( 0,+1))
 
-    R=sparse.bmat([[R00, Z,   Z,  Z],
-                   [Z, R11,   Z,  Z],
-                   [Z,   Z, R22,  Z],
-                   [Z,   Z,   Z,  Z]])
+    Z01 = Z(-1, 0)
+    Z02 = Z(-1,+1)
+    Z03 = Z(-1, 0)
+    Z10 = Z( 0,-1)
+    Z12 = Z( 0,+1)
+    Z13 = Z( 0, 0)
+    Z20 = Z(+1,-1)
+    Z21 = Z(+1, 0)
+    Z23 = Z(+1, 0)
+    Z30 = Z( 0,-1)
+    Z31 = Z( 0, 0)
+    Z32 = Z( 0,+1)
+    Z33 = Z( 0, 0)
+
+    R=sparse.bmat([[R00, Z01, Z02, Z03],
+                   [Z10, R11, Z12, Z13],
+                   [Z20, Z21, R22, Z23],
+                   [Z30, Z31, Z32, Z33]])
     R = R.tocsr()
 
     L00 = -D(-1,1, 0).dot(D(+1, 0,-1))
@@ -45,68 +63,65 @@ def eigensystem(N,ell,B,alpha_BC,cutoff=1e9,boundary_conditions='no-slip'):
     L30 = xim*D(+1,0,-1)
     L32 = xip*D(-1,0,+1)
 
-    L=sparse.bmat([[L00,  Z,   Z, L03],
-                   [Z,  L11,   Z,   Z],
-                   [Z,    Z, L22, L23],
-                   [L30,  Z, L32,   Z]])
+    L=sparse.bmat([[L00, Z01, Z02, L03],
+                   [Z10, L11, Z12, Z13],
+                   [Z20, Z21, L22, L23],
+                   [L30, Z31, L32, Z33]])
 
-    N0, N1, N2, N3 = BC_rows(N)
+    N0, N1, N2, N3 = BC_rows(N,ell,[-1,0,+1,0])
 
     if boundary_conditions == 'no-slip':
 
-        row0 = np.concatenate((               B.op('r=1',N,0,ell-1),np.zeros(N3-N0)))
-        row1 = np.concatenate((np.zeros(N0+1),B.op('r=1',N,0,ell  ),np.zeros(N3-N1)))
-        row2 = np.concatenate((np.zeros(N1+1),B.op('r=1',N,0,ell+1),np.zeros(N3-N2)))
+        row0 = np.concatenate((               ball.operator('r=R',N,0,ell,-1),np.zeros(N3-N0)))
+        row1 = np.concatenate((np.zeros(N0+1),ball.operator('r=R',N,0,ell,0),np.zeros(N3-N1)))
+        row2 = np.concatenate((np.zeros(N1+1),ball.operator('r=R',N,0,ell,+1),np.zeros(N3-N2)))
 
     if boundary_conditions == 'stress-free':
 
-        Q = B.Q[(ell,2)]
-        rDmm = B.xi(-1,ell-1)*B.op('r=1',N,1,ell-2)*D(-1,0,-1)
-        rDpm = B.xi(+1,ell-1)*B.op('r=1',N,1,ell  )*D(+1,0,-1)
-        rDm0 = B.xi(-1,ell  )*B.op('r=1',N,1,ell-1)*D(-1,0, 0)
-        rDp0 = B.xi(+1,ell  )*B.op('r=1',N,1,ell+1)*D(+1,0, 0)
-        rDmp = B.xi(-1,ell+1)*B.op('r=1',N,1,ell  )*D(-1,0,+1)
-        rDpp = B.xi(+1,ell+1)*B.op('r=1',N,1,ell+2)*D(+1,0,+1)
+        Q0 = np.array([[1]])
+        Q1 = ball.recurseQ(Q0,ell,1)
+        Q2 = ball.recurseQ(Q1,ell,2)
+        rDmm = intertwiner.xi(-1,ell-1)*ball.operator('r=R',N,1,ell,-2)*D(-1,0,-1)
+        rDpm = intertwiner.xi(+1,ell-1)*ball.operator('r=R',N,1,ell, 0)*D(+1,0,-1)
+        rDm0 = intertwiner.xi(-1,ell  )*ball.operator('r=R',N,1,ell,-1)*D(-1,0, 0)
+        rDp0 = intertwiner.xi(+1,ell  )*ball.operator('r=R',N,1,ell,+1)*D(+1,0, 0)
+        rDmp = intertwiner.xi(-1,ell+1)*ball.operator('r=R',N,1,ell,  0*D(-1,0,+1)
+        rDpp = intertwiner.xi(+1,ell+1)*ball.operator('r=R',N,1,ell,+2)*D(+1,0,+1)
 
         rD = np.array([rDmm, rDm0, rDmp, 0.*rDmm, 0.*rDm0, 0.*rDmp, rDpm, rDp0, rDpp])
-        QSm = Q[:,::3].dot(rD[::3])
-        QS0 = Q[:,1::3].dot(rD[1::3])
-        QSp = Q[:,2::3].dot(rD[2::3])
-        u0m = B.op('r=1',N,0,ell-1)*B.Q[(ell,1)][1,0]
-        u0p = B.op('r=1',N,0,ell+1)*B.Q[(ell,1)][1,2]
+        QSm = Q2[:, ::3].dot(rD[::3])
+        QS0 = Q2[:,1::3].dot(rD[1::3])
+        QSp = Q2[:,2::3].dot(rD[2::3])
+        u0m = B.op('r=R',N,0,ell,-1)*Q1[1,0]
+        u0p = B.op('r=R',N,0,ell,+1)*Q1[1,2]
 
         row0=np.concatenate(( QSm[1]+QSm[3], QS0[1]+QS0[3], QSp[1]+QSp[3], np.zeros(N3-N2)))
-        row1=np.concatenate(( u0m   ,       np.zeros(N0+1), u0p          , np.zeros(N3-N2)))
+        row1=np.concatenate(( u0m   ,      np.zeros(N1-N0), u0p          , np.zeros(N3-N2)))
         row2=np.concatenate(( QSm[5]+QSm[7], QS0[5]+QS0[7], QSp[5]+QSp[7], np.zeros(N3-N2)))
 
     if boundary_conditions == 'potential-field':
 
-        row0=np.concatenate((               B.op('r=1',N,0,ell-1),           np.zeros(N3-N0)))
-        #L[N0]=np.concatenate((               B.op('r=1',N,1,ell  )*D(+1,0,-1),np.zeros(N3-N0)))
-        row1=np.concatenate((np.zeros(N0+1),B.op('r=1',N,1,ell-1)*D(-1,0, 0),np.zeros(N3-N1)))
-        row2=np.concatenate((np.zeros(N1+1),B.op('r=1',N,1,ell  )*D(-1,0,+1),np.zeros(N3-N2)))
+        row0=np.concatenate((               ball.operator('r=R',N,0,ell,-1),           np.zeros(N3-N0)))
+        row1=np.concatenate((np.zeros(N0+1),ball.operator('r=R',N,1,ell,-1)*D(-1,0, 0),np.zeros(N3-N1)))
+        row2=np.concatenate((np.zeros(N1+1),ball.operator('r=R',N,1,ell, 0)*D(-1,0,+1),np.zeros(N3-N2)))
 
     if boundary_conditions == 'pseudo-vacuum':
 
-        row0=np.concatenate((               B.op('r=1',N,0,ell-1),           np.zeros(N3-N0)))
-       #L[N0]=np.concatenate((               B.op('r=1',N,1,ell  )*D(+1,0,-1),np.zeros(N3-N0)))
-        row1=np.concatenate((np.zeros(N0+1),B.op('r=1',N,1,ell-1)*D(-1,0, 0) - ell*B.op('r=1',N,0,ell),np.zeros(N3-N1)))
-        row2=np.concatenate((np.zeros(N1+1),B.op('r=1',N,1,ell  )*D(-1,0,+1),np.zeros(N3-N2)))
+        row0=np.concatenate((               ball.operator('r=R',N,0,ell,-1),           np.zeros(N3-N0)))
+        row1=np.concatenate((np.zeros(N0+1),ball.operator('r=R',N,1,ell,-1)*D(-1,0, 0) - ell*ball.operator('r=R',N,0,ell,0),np.zeros(N3-N1)))
+        row2=np.concatenate((np.zeros(N1+1),ball.operator('r=R',N,1,ell, 0)*D(-1,0,+1),np.zeros(N3-N2)))
 
     if boundary_conditions == 'perfectly-conducting':
 
-        row0=np.concatenate((np.zeros(N2+1),B.op('r=1',N,0,ell)))
-        row1=np.concatenate((np.zeros(N0+1),B.op('r=1',N,0,ell),np.zeros(N3-N1)))
-        row2=np.concatenate((B.xi(+1,ell)*B.op('r=1',N,0,ell-1),np.zeros(N0+1),-B.xi(-1,ell)*B.op('r=1',N,0,ell+1),np.zeros(N3-N2)))
+        row0=np.concatenate((np.zeros(N2+1),ball.operator('r=R',N,0,ell,0)))
+        row1=np.concatenate((np.zeros(N0+1),ball.operator('r=R',N,0,ell,0),np.zeros(N3-N1)))
+        row2=np.concatenate((intertwiner.xi(+1,ell)*ball.operator('r=R',N,0,ell,-1),
+                             np.zeros(N0+1),-intertwiner.xi(-1,ell)*ball.operator('r=R',N,0,ell,+1),np.zeros(N3-N2)))
 
 
     C0 = connection(N,ell-1,alpha_BC,2)
     C1 = connection(N,ell  ,alpha_BC,2)
     C2 = connection(N,ell+1,alpha_BC,2)
-
-    R00 = E(1,-1).dot(E( 0,-1))
-    R11 = E(1, 0).dot(E( 0, 0))
-    R22 = E(1,+1).dot(E( 0,+1))
 
     tau0 = C0[:,-1]
     tau0 = tau0.reshape((len(tau0),1))

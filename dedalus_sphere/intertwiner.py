@@ -90,9 +90,3 @@ def index2tuple(index,order,indexing=(-1,1,0)):
     
     return tuple(tup)
 
-
-
-
-
-
-
