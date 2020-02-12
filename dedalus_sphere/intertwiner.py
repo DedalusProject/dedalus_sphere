@@ -39,16 +39,16 @@ def regularity2spinMap(ell,spin,regularity):
     if forbidden_spin(ell,spin) or forbidden_regularity(ell,regularity): return 0
     
     if type(spin) == int:
-        rank = 1
+        order = 1
         sigma, a = spin, regularity
         tau,   b = (), ()
     else:
-        rank = len(spin)
+        order = len(spin)
         sigma, a = spin[0],  regularity[0]
         tau,   b = spin[1:], regularity[1:]
     
     R = 0
-    for i in range(rank-1):
+    for i in range(order-1):
         if tau[i] == -sigma:
             R -= regularity2spinMap(ell,_swap(tau,i,0),b)
         if tau[i] == 0:
@@ -66,26 +66,27 @@ def regularity2spinMap(ell,spin,regularity):
     if a ==  0: return  sigma*R/np.sqrt(degree*(degree+1))
     if a == +1: return (Qold*(degree+1) + R)/np.sqrt((degree+1)*(2*degree+1))
 
-def spin2regularityMap(ell,regularity,spin): return regularity2spinMap(ell,regularity,spin)
+def spin2regularityMap(ell,regularity,spin):
+    return regularity2spinMap(ell,regularity,spin)
 
-def tuple2index(tup,order=(-1,0,1)):
+def tuple2index(tup,indexing=(-1,1,0)):
     index = 0
-    for p,e in enumerate(tup[::-1]): index += (order[e+1]+1)*3**p
+    for p,e in enumerate(tup[::-1]): index += (indexing[e+1]+1)*3**p
     return index
 
-def index2tuple(index,rank,order=(-1,0,1)):
+def index2tuple(index,order,indexing=(-1,1,0)):
     
     tup = []
     while index > 0:
         
-        tup = [order[index%3]] + tup
+        tup = [indexing[index%3]] + tup
         index //= 3
     
     r = len(tup)
-    if r < rank:
-        tup = (rank-r)*[order[0]] + tup
+    if r < order:
+        tup = (order-r)*[indexing[0]] + tup
     
-    if r > rank: raise ValueError('rank smaller than tuple length.')
+    if r > order: raise ValueError('tensor order smaller than tuple length.')
     
     return tuple(tup)
 
