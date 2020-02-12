@@ -19,7 +19,7 @@ def trial_functions(dimension,Nmax,ell,degree,z,alpha=alpha):
     return jacobi.recursion(N,a,b,z,init)
 
 
-def operator(dimension,op,k,ell,degree,radius=1,pad=0,alpha=alpha):
+def operator(dimension,op,Nmax,k,ell,degree,radius=1,pad=0,alpha=alpha):
     
     # derivatives, r multiplication
     if op in ['D-','D+','R-','R+']:
@@ -65,6 +65,12 @@ def _regularity2Jacobi(dimension,Nmax,k,ell,degree,ddeg=None,alpha=alpha):
     dn = max((ell + degree)//2,0) - max((ell + degree + ddeg)//2,0)
     
     return a, b, n, dn
+
+def zeros(Nmax, ell, deg_out, deg_in):
+
+    N1 = Nmax - max((ell + deg_out)//2,0)
+    N2 = Nmax - max((ell + deg_in) //2,0)
+    return np.zeros((N1,N2),dtype=np.complex256)
 
 def xi(mu,ell):
     """
