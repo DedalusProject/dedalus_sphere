@@ -1,5 +1,4 @@
 import ball_diffusion as bd
-from dedalus_sphere import ball_wrapper as ball
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -64,9 +63,6 @@ text_y = 0.875
 
 ell = 50
 
-L_max, R_max = 63, 3
-B = ball.Ball(N_max,L_max,R_max=R_max,ell_min = 48,ell_max=52)
-
 calculate = True
 
 if not os.path.isdir('data'):
@@ -76,12 +72,12 @@ if not os.path.isdir('data/eigenvalues_256'):
 
 boundary_conditions = 'no-slip'
 if calculate:
-  vals, vecs = bd.eigensystem(N_max,ell,B,alpha_BC=2,boundary_conditions=boundary_conditions)
+  vals, vecs = bd.eigensystem(N_max,ell,alpha_BC=2,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/no_slip_eigs_a2.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,boundary_conditions)
   vals_analytic = eigenvalues(vals_analytic,len(vals))
   np.save('data/eigenvalues_256/no_slip_eigs_analytic_a2.npy',vals_analytic)
-  vals, vecs =     bd.eigensystem(N_max,ell,B,alpha_BC=0,boundary_conditions=boundary_conditions)
+  vals, vecs =     bd.eigensystem(N_max,ell,alpha_BC=0,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/no_slip_eigs_a0.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,boundary_conditions)
   vals_analytic = eigenvalues(vals_analytic,len(vals))
@@ -97,12 +93,12 @@ eigs.append(np.abs(vals**2-vals_analytic**2)/np.abs(vals_analytic**2))
 
 boundary_conditions = 'stress-free'
 if calculate:
-  vals, vecs = bd.eigensystem(N_max,ell,B,alpha_BC=2,boundary_conditions=boundary_conditions)
+  vals, vecs = bd.eigensystem(N_max,ell,alpha_BC=2,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/stress_free_eigs_a2.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,boundary_conditions)
   vals_analytic = eigenvalues(vals_analytic,len(vals))
   np.save('data/eigenvalues_256/stress_free_eigs_analytic_a2.npy',vals_analytic)
-  vals, vecs =     bd.eigensystem(N_max,ell,B,alpha_BC=0,boundary_conditions=boundary_conditions)
+  vals, vecs =     bd.eigensystem(N_max,ell,alpha_BC=0,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/stress_free_eigs_a0.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,boundary_conditions)
   vals_analytic = eigenvalues(vals_analytic,len(vals))
@@ -118,12 +114,12 @@ eigs.append(np.abs(vals**2-vals_analytic**2)/np.abs(vals_analytic**2))
 
 boundary_conditions = 'potential-field'
 if calculate:
-  vals, vecs = bd.eigensystem(N_max,ell,B,alpha_BC=2,boundary_conditions=boundary_conditions)
+  vals, vecs = bd.eigensystem(N_max,ell,alpha_BC=2,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/potential_eigs_a2.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,'potential')
   vals_analytic = eigenvalues(vals_analytic,len(vals))
   np.save('data/eigenvalues_256/potential_eigs_analytic_a2.npy',vals_analytic)
-  vals, vecs =     bd.eigensystem(N_max,ell,B,alpha_BC=0,boundary_conditions=boundary_conditions)
+  vals, vecs =     bd.eigensystem(N_max,ell,alpha_BC=0,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/potential_eigs_a0.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,'potential')
   vals_analytic = eigenvalues(vals_analytic,len(vals))
@@ -139,12 +135,12 @@ eigs.append(np.abs(vals**2-vals_analytic**2)/np.abs(vals_analytic**2))
 
 boundary_conditions = 'perfectly-conducting'
 if calculate:
-  vals, vecs = bd.eigensystem(N_max,ell,B,alpha_BC=2,boundary_conditions=boundary_conditions)
+  vals, vecs = bd.eigensystem(N_max,ell,alpha_BC=2,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/conducting_eigs_a2.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,'conducting')
   vals_analytic = eigenvalues(vals_analytic,len(vals))
   np.save('data/eigenvalues_256/conducting_eigs_analytic_a2.npy',vals_analytic)
-  vals, vecs =     bd.eigensystem(N_max,ell,B,alpha_BC=0,boundary_conditions=boundary_conditions)
+  vals, vecs =     bd.eigensystem(N_max,ell,alpha_BC=0,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/conducting_eigs_a0.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,'conducting')
   vals_analytic = eigenvalues(vals_analytic,len(vals))
@@ -160,12 +156,12 @@ eigs.append(np.abs(vals**2-vals_analytic**2)/np.abs(vals_analytic**2))
 
 boundary_conditions = 'pseudo-vacuum'
 if calculate:
-  vals, vecs = bd.eigensystem(N_max,ell,B,alpha_BC=2,boundary_conditions=boundary_conditions)
+  vals, vecs = bd.eigensystem(N_max,ell,alpha_BC=2,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/pseudo_vacuum_eigs_a2.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,'pseudo')
   vals_analytic = eigenvalues(vals_analytic,len(vals))
   np.save('data/eigenvalues_256/pseudo_vacuum_eigs_analytic_a2.npy',vals_analytic)
-  vals, vecs =     bd.eigensystem(N_max,ell,B,alpha_BC=0,boundary_conditions=boundary_conditions)
+  vals, vecs =     bd.eigensystem(N_max,ell,alpha_BC=0,boundary_conditions=boundary_conditions)
   np.save('data/eigenvalues_256/pseudo_vacuum_eigs_a0.npy',vals)
   vals_analytic = wavenumbers(ell,N_max+1,'pseudo')
   vals_analytic = eigenvalues(vals_analytic,len(vals))
@@ -194,5 +190,5 @@ for i in range(5):
   if i>0 and i < 4:
     plot_axes[i].yaxis.set_ticks([1e-16,1e-14,1e-12,1e-10,1e-8,1e-6,1e-4,1e-2])
 
-plt.savefig('figures/eigenvalues_BC.eps')
+plt.savefig('figures/eigenvalues_BC.png')
 
