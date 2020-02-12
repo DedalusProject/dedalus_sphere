@@ -27,13 +27,15 @@ def connection(N,ab,cd):
     a,b = ab
     c,d = cd
     
-    z, w = quadrature(N,a,b)
+    zcd, wcd = quadrature(N,c,d)
     
-    init = 1 + 0*z
-    Pab = recursion(N,a,b,z,init)
-    Pcd = recursion(N,c,d,z,init)
+    wcd /= np.sum(wcd)
     
-    return Pcd @ (w*Pab).T
+    init = 1 + 0*zcd
+    Pab = recursion(N,a,b,zcd,init)
+    Pcd = recursion(N,c,d,zcd,init)
+    
+    return Pcd @ (wcd*Pab).T
 
 def grid_guess(Jacobi_matrix,symmetric=True):
     """Returns reasonable Gauss quadrature grid as the Jacobi matrix eigenvalues.
