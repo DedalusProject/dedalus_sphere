@@ -1,7 +1,7 @@
 import numpy             as np
 from . import jacobi128  as jacobi
 
-# The defalut configurations for the base Jacobi parameters.
+# The defalut configurations for the base Jacobi parameter.
 alpha = 0
 
 def quadrature(dimension,Nmax,alpha=alpha,**kw):
