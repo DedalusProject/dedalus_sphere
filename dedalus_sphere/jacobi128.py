@@ -5,15 +5,10 @@ import scipy.special     as fun
 
 dtype = np.float128
 
-def connection(N,ab,cd):
+def connection(N,ab,cd,init_ab=1,init_cd=1):
     """The connection matrix between any bases coefficients:
         
-        Pab(z) = Pcd(z) . C    -->    Fcd = C . Fab
-        
-        C(a,b) = inverse(C(b,a))
-        
-        if b = a    --> C =         operator('I',N,0,ell,a)
-        if b = a+1  --> C = sqrt(2)*operator('E',N,0,ell,a)
+        Pab(z) = Pcd(z) @ Cab2cd    -->    Fcd = Cab2cd @ Fab
         
         The output is always a dense matrix format.
         
@@ -31,9 +26,8 @@ def connection(N,ab,cd):
     
     wcd /= np.sum(wcd)
     
-    init = 1 + 0*zcd
-    Pab = recursion(N,a,b,zcd,init)
-    Pcd = recursion(N,c,d,zcd,init)
+    Pab = recursion(N,a,b,zcd,init_ab + 0*zcd)
+    Pcd = recursion(N,c,d,zcd,init_cd + 0*zcd)
     
     return Pcd @ (wcd*Pab).T
 
