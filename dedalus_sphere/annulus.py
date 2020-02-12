@@ -42,8 +42,8 @@ def operator(dimension,op,Nmax,k,ell,radii,pad=0,alpha=alpha):
     D = jacobi.operator('D+',N+2,a,b) @ Z
     
     # derivatives
-    if op == 'D+': return (D - (ell+k+dimension-2)*E)[:N+1,:N+1]/gapwidth
-    if op == 'D-': return (D + (ell-k            )*E)[:N+1,:N+1]/gapwidth
+    if op == 'D+': return (D - (ell+k+1          )*E)[:N+1,:N+1]/gapwidth
+    if op == 'D-': return (D + (ell-k+dimension-3)*E)[:N+1,:N+1]/gapwidth
     
     if op == 'r=Ri': return jacobi.operator('z=-1',N,a,b)
     if op == 'r=Ro': return jacobi.operator('z=+1',N,a,b)
