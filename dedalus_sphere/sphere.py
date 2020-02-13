@@ -37,6 +37,10 @@ def Y(Lmax,m,s,cos_theta):
     return jacobi.recursion(N,a,b,cos_theta,init)
 
 
+def k_elements(mu,ell,s,radius=1):
+    return -mu*np.sqrt((ell-mu*s)*(ell+mu*s+1)/2)/radius
+
+
 def operator(op,Lmax,m,s,radius=1):
     """
         Various derivative and multiplication operators for spin-weighted spherical harmonics .
@@ -54,14 +58,14 @@ def operator(op,Lmax,m,s,radius=1):
         
         """
 
-    if op in ['k-','k+','S-','S+']:
+    if op in ['D-','D+','S-','S+']:
     
         ds             = int(op[1]+'1')
         a, b, da,db, N = _spin2Jacobi(Lmax,m,s,ds=ds)
         rescale        = -ds*np.sqrt(0.5)/radius
     
         # derivatives
-        if (op == 'k+') or (op=='k-'):
+        if (op == 'D+') or (op=='D-'):
             if (da== 1) and (db==-1): return jacobi.operator('C+',N  ,a,b,rescale=rescale)
             if (da==-1) and (db== 1): return jacobi.operator('C-',N  ,a,b,rescale=rescale)
             if (da== 1) and (db== 1): return jacobi.operator('D+',N  ,a,b,rescale=rescale)[:-1,:]
@@ -133,7 +137,4 @@ def zeros(out_size,in_size):
     """ non-square array of zeros.""" # Cannot make an operator because of non-square.
     return sparse.csr_matrix((out_size+1,in_size+1))
 
-
-def k_elements(mu,ell,s):
-    return -mu*np.sqrt((ell-mu*s)*(ell+mu*s+1)/2)
 
