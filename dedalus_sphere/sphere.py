@@ -134,4 +134,6 @@ def zeros(out_size,in_size):
     return sparse.csr_matrix((out_size+1,in_size+1))
 
 
+def k_elements(mu,ell,s):
+    return -mu*np.sqrt((ell-mu*s)*(ell+mu*s+1)/2)
 
