@@ -68,7 +68,7 @@ def _regularity2Jacobi(dimension,Nmax,k,ell,degree,ddeg=None,alpha=alpha):
 
 def zeros(Nmax, ell, deg_out, deg_in):
 
-    N1 = Nmax - max((ell + deg_out)//2,0)
-    N2 = Nmax - max((ell + deg_in) //2,0)
+    N1 = Nmax - max((ell + deg_out)//2,0) + 1
+    N2 = Nmax - max((ell + deg_in) //2,0) + 1
     return np.zeros((N1,N2),dtype=np.complex256)
 
