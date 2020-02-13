@@ -133,7 +133,7 @@ def _spin2Jacobi(Lmax,m,s,dm=None,ds=None):
     
     return a,b,da,db,n
 
-def size(Lmax,m,s): return Lmax - np.max([np.abs(m),np.abs(s)]) + add
+def size(Lmax,m,s): return Lmax - np.max([np.abs(m),np.abs(s)])
 
 def zeros(Lmax,m,s_in,s_out):
     """ non-square array of zeros."""
