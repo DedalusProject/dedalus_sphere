@@ -37,7 +37,7 @@ def Y(Lmax,m,s,cos_theta):
     return jacobi.recursion(N,a,b,cos_theta,init)
 
 
-def k_elements(mu,ell,s,radius=1):
+def k_element(mu,ell,s,radius=1):
     return -mu*np.sqrt((ell-mu*s)*(ell+mu*s+1)/2)/radius
 
 
@@ -121,7 +121,7 @@ def _spin2Jacobi(Lmax,m,s,dm=None,ds=None):
         
         """
     
-    a, b, n = abs(m+s), abs(m-s), Lmax - np.max([np.abs(m),np.abs(s)])
+    a, b, n = abs(m+s), abs(m-s), size(Lmax,m,s)
     
     if (dm == None) and (ds == None): return a,b,n
     
@@ -133,8 +133,11 @@ def _spin2Jacobi(Lmax,m,s,dm=None,ds=None):
     
     return a,b,da,db,n
 
-def zeros(out_size,in_size):
-    """ non-square array of zeros.""" # Cannot make an operator because of non-square.
-    return sparse.csr_matrix((out_size+1,in_size+1))
+def size(Lmax,m,s): return Lmax - np.max([np.abs(m),np.abs(s)]) + add
+
+def zeros(Lmax,m,s_in,s_out):
+    """ non-square array of zeros."""
+    Nout, Nin = size(Mmax,m,s_out), size(Lmax,m,s_in)
+    return sparse.csr_matrix((Nout+1,Nin+1))
 
 
