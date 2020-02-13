@@ -62,7 +62,7 @@ def _regularity2Jacobi(dimension,Nmax,k,ell,degree,ddeg=None,alpha=alpha):
     
     if ddeg == None: return a, b, n
     
-    dn = max((ell + degree)//2,0) - max((ell + degree + ddeg)//2,0)
+    dn = size(0,ell,degree+ddeg) - size(0,ell,degree)
     
     return a, b, n, dn
 
