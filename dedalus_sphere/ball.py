@@ -27,8 +27,8 @@ def operator(dimension,op,Nmax,k,ell,degree,radius=1,pad=0,alpha=alpha):
         ddeg = int(op[1]+'1')
         a, b, N, dN  = _regularity2Jacobi(dimension,Nmax+pad,k,ell,degree,ddeg=ddeg,alpha=alpha)
 
-        if op == 'D-': op, rescale = 'C+', 2.0/radius
-        if op == 'D+': op, rescale = 'D+', 2.0/radius
+        if op == 'D-': op, rescale = 'C+', np.sqrt(8.0)/radius
+        if op == 'D+': op, rescale = 'D+', np.sqrt(8.0)/radius
         if op == 'R-': op, rescale = 'B-', np.sqrt(0.5)*radius
         if op == 'R+': op, rescale = 'B+', np.sqrt(0.5)*radius
         
@@ -46,7 +46,8 @@ def operator(dimension,op,Nmax,k,ell,degree,radius=1,pad=0,alpha=alpha):
     if op == 'I':  return jacobi.operator('I',N,a,b)
 
     # conversion
-    if op == 'E':  return jacobi.operator('A+',N,a,b,rescale=np.sqrt(0.5))
+#    if op == 'E':  return jacobi.operator('A+',N,a,b,rescale=np.sqrt(0.5))
+    if op == 'E':  return jacobi.operator('A+',N,a,b)
     
     # z = 2*(r/R)**2 - 1 multiplication
     if op == 'Z': return jacobi.operator('J',N,a,b)
