@@ -26,7 +26,7 @@ def BC_rows(N,ell,deg):
     return N_list
 
 def matrices(N,l,nu):
-    
+
     def D(mu,i,deg):
         if mu == +1: return ball.operator(3,'D+',N,i,l,deg)
         if mu == -1: return ball.operator(3,'D-',N,i,l,deg)
@@ -64,33 +64,33 @@ def matrices(N,l,nu):
         M = ball.operator(3,'0',N1-1+3,0,l,0).tocsr()
         L = ball.operator(3,'I',N1-1+3,0,l,0).tocsr()
         return M, L
-    
+
     xim, xip = intertwiner.xi([-1,+1],l)
-    
+
     M00 = E(1,-1).dot(E( 0,-1))
     M11 = E(1,+1).dot(E( 0,+1))
     M22 = E(1, 0).dot(E( 0, 0))
-    
+
     M=sparse.bmat([[M00, Z01, Z02, Z03],
                    [Z10, M11, Z12, Z13],
                    [Z20, Z21, M22, Z23],
                    [Z30, Z31, Z32, Z33]])
     M = M.tocsr()
-                   
+
     L00 = -nu*D(-1,1, 0).dot(D(+1, 0,-1))
     L11 = -nu*D(+1,1, 0).dot(D(-1, 0,+1))
     L22 = -nu*D(-1,1,+1).dot(D(+1, 0, 0))
-                   
+
     L03 = xim*E(+1,-1).dot(D(-1,0,0))
     L13 = xip*E(+1,+1).dot(D(+1,0,0))
-        
+
     L30 = xim*D(+1,0,-1)
     L31 = xip*D(-1,0,+1)
 
     if l < 4:
         print(l, D(+1,0,-1).A[-1])
         print(l, D(-1,0,+1).A[-1])
-                   
+
     L=sparse.bmat([[L00, Z01, Z02, L03],
                    [Z10, L11, Z12, L13],
                    [Z20, Z31, L22, Z23],
@@ -116,7 +116,7 @@ def matrices(N,l,nu):
                      [row0,    0 ,   0,    0],
                      [row1,    0 ,   0,    0],
                      [row2,    0,    0,    0]])
-    
+
     M = sparse.bmat([[     M, 0*col0, 0*col1, 0*col2],
                      [0*row0,      0 ,     0,      0],
                      [0*row1,      0 ,     0,      0],
@@ -145,8 +145,8 @@ class StateVector:
                 field_num, field_component = component[0], component[1]
                 if self.basis.regularity_allowed(l,field_component):
                     component_size = self.basis.n_size(field_component,l)
-                    slices_l.append(slice(pencil_length, pencil_length+component_size+1))
-                    pencil_length += component_size+1
+                    slices_l.append(slice(pencil_length, pencil_length+component_size))
+                    pencil_length += component_size
                 else:
                     slices_l.append(())
             self.slices.append(slices_l)
@@ -313,7 +313,7 @@ iter = 0
 while t < t_end:
 
     nonlinear(state_vector, NL, t)
-    
+
     if iter % 10 == 0:
         E0 = np.sum(weight_r*weight_theta*(u['g']**2) )
         E0 = 0.5*E0*(np.pi)/(Lmax+1)/L_dealias
