@@ -174,7 +174,6 @@ class StateVector:
         for dl,l in enumerate(self.basis.local_l):
             for dm,m in enumerate(self.basis.local_m):
                 if m <= l:
-                    self.data[dl][dm] *= 0 
                     for i, component in enumerate(self.component_list):
                         field_num, field_component = component[0], component[1]
                         reg = field_component
@@ -187,7 +186,6 @@ class StateVector:
     def unpack(self,fields):
         for field in fields:
             field.set_layout(field.dist.coeff_layout)
-            field['c'] *= 0
         for dl,l in enumerate(self.basis.local_l):
             for dm,m in enumerate(self.basis.local_m):
                 if m <= l:
@@ -276,7 +274,7 @@ def nonlinear(state_vector, NL, t):
     state_vector.unpack((u,p))
 
     Du.set_layout(Du.dist.coeff_layout)
-    Du['c'] *= 0
+    Du['c'] = 0
     op = de.operators.Gradient(u, c)
     op.out = Du
     op.evaluate()
