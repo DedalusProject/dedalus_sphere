@@ -26,7 +26,7 @@ def BC_rows(N,ell,deg):
     return N_list
 
 def matrices(N,l,nu):
-    
+
     def D(mu,i,deg):
         if mu == +1: return ball.operator(3,'D+',N,i,l,deg)
         if mu == -1: return ball.operator(3,'D-',N,i,l,deg)
@@ -64,9 +64,9 @@ def matrices(N,l,nu):
         M = ball.operator(3,'0',N1-1+3,0,l,0).tocsr()
         L = ball.operator(3,'I',N1-1+3,0,l,0).tocsr()
         return M, L
-    
+
     xim, xip = intertwiner.xi([-1,+1],l)
-    
+
     M00 = E(1,-1).dot(E( 0,-1))
     M11 = E(1,+1).dot(E( 0,+1))
     M22 = E(1, 0).dot(E( 0, 0))
@@ -80,10 +80,10 @@ def matrices(N,l,nu):
     L00 = -nu*D(-1,1, 0).dot(D(+1, 0,-1))
     L11 = -nu*D(+1,1, 0).dot(D(-1, 0,+1))
     L22 = -nu*D(-1,1,+1).dot(D(+1, 0, 0))
-                   
+
     L03 = xim*E(+1,-1).dot(D(-1,0,0))
     L13 = xip*E(+1,+1).dot(D(+1,0,0))
-        
+
     L30 = xim*D(+1,0,-1)
     L31 = xip*D(-1,0,+1)
 
@@ -116,7 +116,7 @@ def matrices(N,l,nu):
                      [row0,    0 ,   0,    0],
                      [row1,    0 ,   0,    0],
                      [row2,    0,    0,    0]])
-    
+
     M = sparse.bmat([[     M, 0*col0, 0*col1, 0*col2],
                      [0*row0,      0 ,     0,      0],
                      [0*row1,      0 ,     0,      0],
@@ -312,7 +312,7 @@ import scipy
 while t < t_end:
 
     nonlinear(state_vector, NL, t)
-    
+
     if iter % 10 == 0:
         E0 = np.sum(vol_correction*weight_r*weight_theta*u['g'].real**2)
         E0 = 0.5*E0*(np.pi)/(Lmax+1)/L_dealias
