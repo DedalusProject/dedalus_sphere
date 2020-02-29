@@ -4,7 +4,8 @@ import numpy as np
 from scipy.sparse import linalg
 
 from dedalus.tools.config import config
-STORE_LU = config['linear algebra'].getboolean('store_LU')
+#STORE_LU = config['linear algebra'].getboolean('store_LU')
+STORE_LU = True
 PERMC_SPEC = config['linear algebra']['permc_spec']
 USE_UMFPACK = config['linear algebra'].getboolean('use_umfpack')
 
@@ -104,8 +105,8 @@ class MultistepIMEX:
                 if m <= l:
                     MX0.data[dl][dm] = M[dl].dot(state_vector.data[dl][dm])
                     LX0.data[dl][dm] = L[dl].dot(state_vector.data[dl][dm])
-                    F0.data[dl][dm] = NL.data[dl][dm]
-    
+                    np.copyto(F0.data[dl][dm],NL.data[dl][dm])
+
                     # Build RHS
                     RHS.data[dl][dm] *= 0.
                     for j in range(1, len(c)):
@@ -114,7 +115,7 @@ class MultistepIMEX:
                         RHS.data[dl][dm] -= a[j] * MX[j-1].data[dl][dm]
                     for j in range(1, len(b)):
                         RHS.data[dl][dm] -= b[j] * LX[j-1].data[dl][dm]
-    
+
                     # Solve
                     if STORE_LU:
                         if update_LHS:

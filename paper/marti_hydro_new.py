@@ -70,13 +70,13 @@ def matrices(N,l,nu):
     M00 = E(1,-1).dot(E( 0,-1))
     M11 = E(1,+1).dot(E( 0,+1))
     M22 = E(1, 0).dot(E( 0, 0))
-    
+
     M=sparse.bmat([[M00, Z01, Z02, Z03],
                    [Z10, M11, Z12, Z13],
                    [Z20, Z21, M22, Z23],
                    [Z30, Z31, Z32, Z33]])
-    M = M.tocsr()
-                   
+    M.tocsr()
+
     L00 = -nu*D(-1,1, 0).dot(D(+1, 0,-1))
     L11 = -nu*D(+1,1, 0).dot(D(-1, 0,+1))
     L22 = -nu*D(-1,1,+1).dot(D(+1, 0, 0))
@@ -87,15 +87,12 @@ def matrices(N,l,nu):
     L30 = xim*D(+1,0,-1)
     L31 = xip*D(-1,0,+1)
 
-    if l < 4:
-        print(l, D(+1,0,-1).A[-1])
-        print(l, D(-1,0,+1).A[-1])
-                   
     L=sparse.bmat([[L00, Z01, Z02, L03],
                    [Z10, L11, Z12, L13],
-                   [Z20, Z31, L22, Z23],
+                   [Z20, Z21, L22, Z23],
                    [L30, L31, Z32, Z33]])
     L = L.tocsr()
+
     row0=np.concatenate((             ball.operator(3,'r=R',N,0,l,-1),np.zeros(N3-N0)))
     row1=np.concatenate((np.zeros(N0),ball.operator(3,'r=R',N,0,l,+1),np.zeros(N3-N1)))
     row2=np.concatenate((np.zeros(N1),ball.operator(3,'r=R',N,0,l, 0),np.zeros(N3-N2)))
@@ -111,6 +108,9 @@ def matrices(N,l,nu):
     col0 = np.concatenate((                 tau0,np.zeros((N3-N0,1))))
     col1 = np.concatenate((np.zeros((N0,1)),tau1,np.zeros((N3-N1,1))))
     col2 = np.concatenate((np.zeros((N1,1)),tau2,np.zeros((N3-N2,1))))
+
+    if l % 2 == 1:
+        col0[-1] = 1.
 
     L = sparse.bmat([[   L, col0, col1, col2],
                      [row0,    0 ,   0,    0],
@@ -133,6 +133,7 @@ class StateVector:
         # get a list of fields
         # BCs is a function which returns the number of BCs for a given l
         self.basis = fields[0].bases[0]
+        self.Nmax = self.basis.Nmax
         self.component_list = self.components(fields)
         self.data = []
         self.slices = []
@@ -145,8 +146,8 @@ class StateVector:
                 field_num, field_component = component[0], component[1]
                 if self.basis.regularity_allowed(l,field_component):
                     component_size = self.basis.n_size(field_component,l)
-                    slices_l.append(slice(pencil_length, pencil_length+component_size+1))
-                    pencil_length += component_size+1
+                    slices_l.append(slice(pencil_length, pencil_length+component_size))
+                    pencil_length += component_size
                 else:
                     slices_l.append(())
             self.slices.append(slices_l)
@@ -173,6 +174,7 @@ class StateVector:
         for dl,l in enumerate(self.basis.local_l):
             for dm,m in enumerate(self.basis.local_m):
                 if m <= l:
+                    self.data[dl][dm] *= 0 
                     for i, component in enumerate(self.component_list):
                         field_num, field_component = component[0], component[1]
                         reg = field_component
@@ -180,11 +182,12 @@ class StateVector:
                         if n_slice is not None:
                             self.data[dl][dm][self.slices[dl][i]] = fields[field_num]['c'][field_component][dm,dl,n_slice]
                     BC_len = BCs.shape[0]
-                    self.data[dl][dm][-BC_len:] = BCs[:,dl]
+                    self.data[dl][dm][-BC_len:] = BCs[:,dm,dl]
 
     def unpack(self,fields):
         for field in fields:
             field.set_layout(field.dist.coeff_layout)
+            field['c'] *= 0
         for dl,l in enumerate(self.basis.local_l):
             for dm,m in enumerate(self.basis.local_m):
                 if m <= l:
@@ -196,14 +199,14 @@ class StateVector:
 
 
 # Resolution
-Lmax = 7
-Nmax = 7
+Lmax = 15
+Nmax = 15
 
 alpha_BC = 0
 
 # need to figure out how to do this
-L_dealias = 3/2
-N_dealias = 3/2
+L_dealias = 1
+N_dealias = 1
 N_r = Nmax
 
 # parameters
@@ -213,7 +216,7 @@ nu = 1e-2
 
 # Integration parameters
 dt = 0.02
-t_end = 40
+t_end = 20
 
 c = de.coords.SphericalCoordinates('phi', 'theta', 'r')
 d = de.distributor.Distributor(c.coords)
@@ -238,15 +241,16 @@ u_bc['g'][2] = 0. # u_r = 0
 u_bc['g'][1] = - u0*r**2*np.cos(theta)*np.cos(phi)
 u_bc['g'][0] = u0*r**2*np.sin(phi)
 
-BC_shape = u_bc['c'][:,0,:,0].shape
+BC_shape = u_bc['c'][:,:,:,0].shape
 
 BCs = np.zeros(BC_shape, dtype=np.complex128)
 
-for dl, l in enumerate(b.local_l):
-    for i in range(3):
-        if l > 0:
-            n_slice = b.n_slice((i,),l)
-            BCs[i,dl] = ball.operator(3,'r=R',Nmax,0,l,b.regtotal(i)).astype(np.float64) @ u_bc['c'][i,0,dl,n_slice]
+for dm, m in enumerate(b.local_m):
+    for dl, l in enumerate(b.local_l):
+        for i in range(3):
+            if l > 0:
+                n_slice = b.n_slice((i,),l)
+                BCs[i,dm,dl] = ball.operator(3,'r=R',Nmax,0,l,b.regtotal(i)).astype(np.float64) @ u_bc['c'][i,dm,dl,n_slice]
 
 # build state vector
 state_vector = StateVector((u,p))
@@ -262,23 +266,8 @@ for l in b.local_l:
     P.append(M_ell.astype(np.complex128))
     LU.append([None])
 
-#import matplotlib
-#matplotlib.use('Agg')
-#import matplotlib.pyplot as plt
-#
-#fig = plt.figure()
-#ax = fig.add_subplot(111)
-#ax.imshow(np.log(np.abs(L[2].A)))
-#ax.set_aspect(1)
-#plt.savefig('matrix2.png')
-#
-#print(np.sum(np.abs(L[1].A),axis=0))
-#print(np.sum(np.abs(L[1].A),axis=1))
-#print(np.sum(np.abs(L[2].A),axis=0))
-#print(np.sum(np.abs(L[2].A),axis=1))
-
-def cross_grid(a,b):
-    return np.array([a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]])
+def cross_grid(a,b): #left handed!!!!
+    return np.array([-a[1]*b[2]+a[2]*b[1],-a[2]*b[0]+a[0]*b[2],-a[0]*b[1]+a[1]*b[0]])
 
 # calculate RHS terms from state vector
 def nonlinear(state_vector, NL, t):
@@ -287,16 +276,20 @@ def nonlinear(state_vector, NL, t):
     state_vector.unpack((u,p))
 
     Du.set_layout(Du.dist.coeff_layout)
+    Du['c'] *= 0
     op = de.operators.Gradient(u, c)
     op.out = Du
     op.evaluate()
 
     # R = ez cross u
-    ez = np.array([np.cos(theta),-np.sin(theta),0*np.cos(theta)])
+    ez = np.array([0*np.cos(theta),-np.sin(theta),np.cos(theta)])
     u_rhs.set_layout(u_rhs.dist.grid_layout)
     u_rhs['g'] = -Om*cross_grid(ez,u['g'])
+
     for i in range(3):
         u_rhs['g'] -= u['g'][i]*Du['g'][i,:]
+
+    u_rhs['c'][:,:,0,:] = 0 # very important to zero out the ell=0 RHS
 
     NL.pack((u_rhs,p_rhs),BCs)
 
@@ -310,15 +303,21 @@ t = 0.
 start_time = time.time()
 iter = 0
 
+vol_test = np.sum(weight_r)
+vol_test = reducer.reduce_scalar(vol_test, MPI.SUM)
+vol_correction = 1/3/vol_test
+
+import scipy
+
 while t < t_end:
 
     nonlinear(state_vector, NL, t)
     
     if iter % 10 == 0:
-        E0 = np.sum(weight_r*weight_theta*(u['g']**2) )
+        E0 = np.sum(vol_correction*weight_r*weight_theta*u['g'].real**2)
         E0 = 0.5*E0*(np.pi)/(Lmax+1)/L_dealias
         E0 = reducer.reduce_scalar(E0, MPI.SUM)
-        logger.info("t = %f, E = %f" %(t,E0))
+        logger.info("t = %f, E = %e" %(t,E0))
         t_list.append(t)
         E_list.append(E0)
 
@@ -334,5 +333,5 @@ logger.info("simulation took: %f" %(end_time-start_time))
 if rank==0:
     t_list = np.array(t_list)
     E_list = np.array(E_list)
-    np.savetxt('marti_E.dat',np.array([t_list,E_list]))
+    np.savetxt('marti_E_new.dat',np.array([t_list,E_list]))
 
