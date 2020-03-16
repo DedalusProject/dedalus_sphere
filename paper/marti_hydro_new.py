@@ -230,11 +230,11 @@ p = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
 u_rhs = de.field.Field(dist=d, bases=(bk2,), tensorsig=(c,), dtype=np.complex128)
 p_rhs = de.field.Field(dist=d, bases=(bk2,), dtype=np.complex128)
 
-weight_theta = b.colatitude_weights(1)
-weight_r = b.radius_weights(1)
+weight_theta = b.local_colatitude_weights(1)
+weight_r = b.local_radius_weights(1)
 
 # create boundary conditions
-u_bc = u = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
+u_bc = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
 u_bc['g'][2] = 0. # u_r = 0
 u_bc['g'][1] = - u0*r**2*np.cos(theta)*np.cos(phi)
 u_bc['g'][0] = u0*r**2*np.sin(phi)
@@ -301,17 +301,16 @@ t = 0.
 start_time = time.time()
 iter = 0
 
-vol_test = np.sum(weight_r)
+vol_test = np.sum(weight_r*weight_theta+0*p['g'])*np.pi/(Lmax+1)/L_dealias
 vol_test = reducer.reduce_scalar(vol_test, MPI.SUM)
-vol_correction = 1/3/vol_test
-
-import scipy
+vol_correction = 4*np.pi/3/vol_test
 
 while t < t_end:
+#while iter < 11:
 
     nonlinear(state_vector, NL, t)
 
-    if iter % 10 == 0:
+    if iter % 1 == 0:
         E0 = np.sum(vol_correction*weight_r*weight_theta*u['g'].real**2)
         E0 = 0.5*E0*(np.pi)/(Lmax+1)/L_dealias
         E0 = reducer.reduce_scalar(E0, MPI.SUM)
