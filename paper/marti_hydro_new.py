@@ -227,6 +227,10 @@ u = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
 Du = de.field.Field(dist=d, bases=(bk1,), tensorsig=(c,c,), dtype=np.complex128)
 p = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
 
+ez = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
+ez['g'][1] = -np.sin(theta)
+ez['g'][2] =  np.cos(theta) 
+
 u_rhs = de.field.Field(dist=d, bases=(bk2,), tensorsig=(c,), dtype=np.complex128)
 p_rhs = de.field.Field(dist=d, bases=(bk2,), dtype=np.complex128)
 
@@ -280,9 +284,11 @@ def nonlinear(state_vector, NL, t):
     op.evaluate()
 
     # R = ez cross u
-    ez = np.array([0*np.cos(theta),-np.sin(theta),np.cos(theta)])
     u_rhs.set_layout(u_rhs.dist.grid_layout)
-    u_rhs['g'] = -Om*cross_grid(ez,u['g'])
+    op = de.operators.CrossProduct(ez,u)
+    op.out = u_rhs
+    op.evaluate()
+    u_rhs['g'] *= -Om
 
     for i in range(3):
         u_rhs['g'] -= u['g'][i]*Du['g'][i,:]
