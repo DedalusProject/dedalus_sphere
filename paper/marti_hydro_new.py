@@ -227,6 +227,12 @@ u = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
 Du = de.field.Field(dist=d, bases=(bk1,), tensorsig=(c,c,), dtype=np.complex128)
 p = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
 
+negOm = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
+negOm['g'] = -Om
+
+neg = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
+neg['g'] = -1
+
 ez = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
 ez['g'][1] = -np.sin(theta)
 ez['g'][2] =  np.cos(theta) 
@@ -268,30 +274,15 @@ for l in b.local_l:
     P.append(M_ell.astype(np.complex128))
     LU.append([None])
 
-def cross_grid(a,b): #left handed!!!!
-    return np.array([-a[1]*b[2]+a[2]*b[1],-a[2]*b[0]+a[0]*b[2],-a[0]*b[1]+a[1]*b[0]])
-
 # calculate RHS terms from state vector
 def nonlinear(state_vector, NL, t):
 
     # get U in coefficient space
     state_vector.unpack((u,p))
 
-    Du.set_layout(Du.dist.coeff_layout)
-    Du['c'] = 0
-    op = de.operators.Gradient(u, c)
-    op.out = Du
-    op.evaluate()
-
-    # R = ez cross u
-    u_rhs.set_layout(u_rhs.dist.grid_layout)
-    op = de.operators.CrossProduct(ez,u)
-    op.out = u_rhs
-    op.evaluate()
-    u_rhs['g'] *= -Om
-
-    for i in range(3):
-        u_rhs['g'] -= u['g'][i]*Du['g'][i,:]
+    op = negOm*de.operators.CrossProduct(ez,u) + neg*de.operators.DotProduct(u,de.operators.Gradient(u, c))
+    conv_op = de.operators.convert(op,(bk2,))
+    u_rhs = conv_op.evaluate()
 
     u_rhs['c'][:,:,0,:] = 0 # very important to zero out the ell=0 RHS
 
@@ -311,8 +302,8 @@ vol_test = np.sum(weight_r*weight_theta+0*p['g'])*np.pi/(Lmax+1)/L_dealias
 vol_test = reducer.reduce_scalar(vol_test, MPI.SUM)
 vol_correction = 4*np.pi/3/vol_test
 
-while t < t_end:
-#while iter < 11:
+#while t < t_end:
+while iter < 31:
 
     nonlinear(state_vector, NL, t)
 
