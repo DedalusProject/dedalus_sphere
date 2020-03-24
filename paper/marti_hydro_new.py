@@ -25,37 +25,19 @@ def BC_rows(N,ell,deg):
     N_list = np.cumsum(N_list)
     return N_list
 
+class Subproblem:
+
+    def __init__(self,ell):
+        self.ell = ell
+
 def matrices(N,l,nu):
 
-    def D(mu,i,deg):
-        if mu == +1: return ball.operator(3,'D+',N,i,l,deg)
-        if mu == -1: return ball.operator(3,'D-',N,i,l,deg)
-
-    def E(i,deg): return ball.operator(3,'E',N,i,l,deg)
-
-    def Z(deg_out,deg_in): return ball.zeros(N,l,deg_out,deg_in)
+    sp = Subproblem(l)
 
     def C(deg):
         ab = (alpha_BC,l+deg+0.5)
         cd = (2,       l+deg+0.5)
         return jacobi.connection(N - max((l + deg)//2,0),ab,cd)
-
-    Z00 = Z(-1,-1)
-    Z01 = Z(-1,+1)
-    Z02 = Z(-1, 0)
-    Z03 = Z(-1, 0)
-    Z10 = Z(+1,-1)
-    Z11 = Z(+1,+1)
-    Z12 = Z(+1, 0)
-    Z13 = Z(+1, 0)
-    Z20 = Z( 0,-1)
-    Z21 = Z( 0,+1)
-    Z22 = Z( 0, 0)
-    Z23 = Z( 0, 0)
-    Z30 = Z( 0,-1)
-    Z31 = Z( 0,+1)
-    Z32 = Z( 0, 0)
-    Z33 = Z( 0, 0)
 
     N0, N1, N2, N3 = BC_rows(N,l,[-1,+1,0,0])
 
@@ -65,32 +47,32 @@ def matrices(N,l,nu):
         L = ball.operator(3,'I',N1-1+3,0,l,0).tocsr()
         return M, L
 
-    xim, xip = intertwiner.xi([-1,+1],l)
+    op = de.operators.convert(u, (bk2,))
+    op_matrices = op.expression_matrices(sp, (u,))
+    M00 = op_matrices[u]
 
-    M00 = E(1,-1).dot(E( 0,-1))
-    M11 = E(1,+1).dot(E( 0,+1))
-    M22 = E(1, 0).dot(E( 0, 0))
+    M01 = de.operators.Zero(p, c, (c,)).subproblem_matrix(sp)
+    M10 = de.operators.Zero(u, c, ()).subproblem_matrix(sp)
+    M11 = de.operators.Zero(p, c, ()).subproblem_matrix(sp)
 
-    M=sparse.bmat([[M00, Z01, Z02, Z03],
-                   [Z10, M11, Z12, Z13],
-                   [Z20, Z21, M22, Z23],
-                   [Z30, Z31, Z32, Z33]])
+    M=sparse.bmat([[M00,M01],
+                   [M10,M11]])
+
     M.tocsr()
 
-    L00 = -nu*D(-1,1, 0).dot(D(+1, 0,-1))
-    L11 = -nu*D(+1,1, 0).dot(D(-1, 0,+1))
-    L22 = -nu*D(-1,1,+1).dot(D(+1, 0, 0))
+    op = de.operators.convert(de.operators.Laplacian(u, c) + de.operators.Gradient(p, c), (bk2,))
+    op_matrices = op.expression_matrices(sp, (u,p,))
+    L00 = -nu*op_matrices[u]
+    L01 = op_matrices[p]
 
-    L03 = xim*E(+1,-1).dot(D(-1,0,0))
-    L13 = xip*E(+1,+1).dot(D(+1,0,0))
+    op = de.operators.Divergence(u)
+    L10 = op.subproblem_matrix(sp)
 
-    L30 = xim*D(+1,0,-1)
-    L31 = xip*D(-1,0,+1)
+    L11 = de.operators.Zero(p, c, ()).subproblem_matrix(sp)
 
-    L=sparse.bmat([[L00, Z01, Z02, L03],
-                   [Z10, L11, Z12, L13],
-                   [Z20, Z21, L22, Z23],
-                   [L30, L31, Z32, Z33]])
+    L=sparse.bmat([[L00,L01],
+                   [L10,L11]])
+
     L = L.tocsr()
 
     row0=np.concatenate((             ball.operator(3,'r=R',N,0,l,-1),np.zeros(N3-N0)))
@@ -258,7 +240,7 @@ for dm, m in enumerate(b.local_m):
         for i in range(3):
             if l > 0:
                 n_slice = b.n_slice((i,),l)
-                BCs[i,dm,dl] = ball.operator(3,'r=R',Nmax,0,l,b.regtotal(i)).astype(np.float64) @ u_bc['c'][i,dm,dl,n_slice]
+                BCs[i,dm,dl] = ball.operator(3,'r=R',Nmax,0,l,b.regtotal((i,))).astype(np.float64) @ u_bc['c'][i,dm,dl,n_slice]
 
 # build state vector
 state_vector = StateVector((u,p))
@@ -274,14 +256,16 @@ for l in b.local_l:
     P.append(M_ell.astype(np.complex128))
     LU.append([None])
 
+op = negOm*de.operators.CrossProduct(ez,u) + neg*de.operators.DotProduct(u,de.operators.Gradient(u, c))
+conv_op = de.operators.convert(op,(bk2,))
+
+
 # calculate RHS terms from state vector
 def nonlinear(state_vector, NL, t):
 
     # get U in coefficient space
     state_vector.unpack((u,p))
 
-    op = negOm*de.operators.CrossProduct(ez,u) + neg*de.operators.DotProduct(u,de.operators.Gradient(u, c))
-    conv_op = de.operators.convert(op,(bk2,))
     u_rhs = conv_op.evaluate()
 
     u_rhs['c'][:,:,0,:] = 0 # very important to zero out the ell=0 RHS
@@ -302,12 +286,12 @@ vol_test = np.sum(weight_r*weight_theta+0*p['g'])*np.pi/(Lmax+1)/L_dealias
 vol_test = reducer.reduce_scalar(vol_test, MPI.SUM)
 vol_correction = 4*np.pi/3/vol_test
 
-#while t < t_end:
-while iter < 31:
+while t < t_end:
+#while iter < 31:
 
     nonlinear(state_vector, NL, t)
 
-    if iter % 1 == 0:
+    if iter % 10 == 0:
         E0 = np.sum(vol_correction*weight_r*weight_theta*u['g'].real**2)
         E0 = 0.5*E0*(np.pi)/(Lmax+1)/L_dealias
         E0 = reducer.reduce_scalar(E0, MPI.SUM)
