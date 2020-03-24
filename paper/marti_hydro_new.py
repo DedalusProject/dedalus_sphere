@@ -60,9 +60,9 @@ def matrices(N,l,nu):
 
     M.tocsr()
 
-    op = de.operators.convert(de.operators.Laplacian(u, c) + de.operators.Gradient(p, c), (bk2,))
+    op = de.operators.convert(-nu*de.operators.Laplacian(u, c) + de.operators.Gradient(p, c), (bk2,))
     op_matrices = op.expression_matrices(sp, (u,p,))
-    L00 = -nu*op_matrices[u]
+    L00 = op_matrices[u]
     L01 = op_matrices[p]
 
     op = de.operators.Divergence(u)
@@ -209,12 +209,6 @@ u = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
 Du = de.field.Field(dist=d, bases=(bk1,), tensorsig=(c,c,), dtype=np.complex128)
 p = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
 
-negOm = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
-negOm['g'] = -Om
-
-neg = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
-neg['g'] = -1
-
 ez = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
 ez['g'][1] = -np.sin(theta)
 ez['g'][2] =  np.cos(theta) 
@@ -256,20 +250,16 @@ for l in b.local_l:
     P.append(M_ell.astype(np.complex128))
     LU.append([None])
 
-op = negOm*de.operators.CrossProduct(ez,u) + neg*de.operators.DotProduct(u,de.operators.Gradient(u, c))
+op = -Om*de.operators.CrossProduct(ez,u) - de.operators.DotProduct(u,de.operators.Gradient(u, c))
 conv_op = de.operators.convert(op,(bk2,))
-
 
 # calculate RHS terms from state vector
 def nonlinear(state_vector, NL, t):
 
     # get U in coefficient space
     state_vector.unpack((u,p))
-
     u_rhs = conv_op.evaluate()
-
     u_rhs['c'][:,:,0,:] = 0 # very important to zero out the ell=0 RHS
-
     NL.pack((u_rhs,p_rhs),BCs)
 
 t_list = []
@@ -287,7 +277,6 @@ vol_test = reducer.reduce_scalar(vol_test, MPI.SUM)
 vol_correction = 4*np.pi/3/vol_test
 
 while t < t_end:
-#while iter < 31:
 
     nonlinear(state_vector, NL, t)
 
