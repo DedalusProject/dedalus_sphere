@@ -18,11 +18,13 @@ rank = MPI.COMM_WORLD.rank
 # Gives LHS matrices for hydro.
 
 def BC_rows(N,ell,deg):
-    N_list = []
-    for d in deg:
-        N_list.append( N - max((ell + d)//2,0) + 1 )
-    if len(deg) == 1: return N_list
-    N_list = np.cumsum(N_list)
+    N_list = (np.arange(len(deg))+1)*(N - ell//2 + 1)
+
+#    N_list = []
+#    for d in deg:
+#        N_list.append( N - max((ell + d)//2,0) + 1 )
+#    if len(deg) == 1: return N_list
+#    N_list = np.cumsum(N_list)
     return N_list
 
 class Subproblem:
@@ -37,7 +39,7 @@ def matrices(N,l,nu):
     def C(deg):
         ab = (alpha_BC,l+deg+0.5)
         cd = (2,       l+deg+0.5)
-        return jacobi.connection(N - max((l + deg)//2,0),ab,cd)
+        return jacobi.coefficient_connection(N - l//2,ab,cd)
 
     N0, N1, N2, N3 = BC_rows(N,l,[-1,+1,0,0])
 
@@ -90,8 +92,8 @@ def matrices(N,l,nu):
     col1 = np.concatenate((np.zeros((N0,1)),tau1,np.zeros((N3-N1,1))))
     col2 = np.concatenate((np.zeros((N1,1)),tau2,np.zeros((N3-N2,1))))
 
-    if l % 2 == 1:
-        col0[-1] = 1.
+#    if l % 2 == 1:
+#        col0[-1] = 1.
 
     L = sparse.bmat([[   L, col0, col1, col2],
                      [row0,    0 ,   0,    0],
