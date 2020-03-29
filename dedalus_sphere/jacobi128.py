@@ -5,10 +5,10 @@ import scipy.special     as fun
 
 dtype = np.float128
 
-def connection(N,ab,cd,init_ab=1,init_cd=1):
+def coefficient_connection(N,ab,cd,init_ab=1,init_cd=1):
     """The connection matrix between any bases coefficients:
         
-        Pab(z) = Pcd(z) @ Cab2cd    -->    Fcd = Cab2cd @ Fab
+        Pab(z) = Pcd(z) @ Cab2cd    -->    Acd = Cab2cd @ Aab
         
         The output is always a dense matrix format.
         
@@ -30,6 +30,7 @@ def connection(N,ab,cd,init_ab=1,init_cd=1):
     Pcd = recursion(N,c,d,zcd,init_cd + 0*zcd)
     
     return Pcd @ (wcd*Pab).T
+
 
 def grid_guess(Jacobi_matrix,symmetric=True):
     """Returns reasonable Gauss quadrature grid as the Jacobi matrix eigenvalues.
@@ -205,11 +206,11 @@ def recursion(max_degree,a,b,grid,init):
 
 def push(op,data):
     """Pushforward"""
-    return (op).dot(data)
+    return op @ data
 
 def pull(op,data):
     """Pullback"""
-    return (op.transpose()).dot(data)
+    return op.T @ data
 
 def mass(a,b):
     if a=='inf' and b=='inf': return np.sqrt(np.pi)
@@ -307,15 +308,17 @@ def operator(op,max_degree,a,b,format='csr',rescale=None):
     # <a,b|z=+1>
     if op == 'z=+1':
         n = np.arange(0,N,dtype=np.float64)
-        out = np.sqrt(2*n+a+b+1)*np.sqrt(fun.binom(n+a,a))*np.sqrt(fun.binom(n+a+b,a))
-        if a+b==-1:
+        ab1 = a+b+1
+        out = (2**(-ab1/2))*np.sqrt(2*n+ab1)*np.sqrt(fun.binom(n+a,a))*np.sqrt(fun.binom(n+a+b,a))
+        if ab1==0:
             out[0] = np.sqrt(np.sin(np.pi*np.abs(a))/np.pi)
 
     # <a,b|z=-1>
     if op == 'z=-1':
         n = np.arange(0,N,dtype=np.float64)
-        out = ((-1)**n)*np.sqrt(2*n+a+b+1)*np.sqrt(fun.binom(n+b,b))*np.sqrt(fun.binom(n+a+b,b))
-        if a+b==-1:
+        ab1 = a+b+1
+        out = (2**(-ab1/2))*((-1)**n)*np.sqrt(2*n+ab1)*np.sqrt(fun.binom(n+b,b))*np.sqrt(fun.binom(n+a+b,b))
+        if ab1==0:
             out[0] = np.sqrt(np.sin(np.pi*np.abs(b))/np.pi)
 
     if (op != 'z=+1') and (op != 'z=-1'):

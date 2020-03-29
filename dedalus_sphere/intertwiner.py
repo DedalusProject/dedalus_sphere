@@ -13,30 +13,31 @@ def xi(mu,ell):
     
     return np.abs(mu)*np.sqrt((1 + mu/(2*ell+1))/2)
 
-def forbidden_spin(ell,spin):
-    if type(spin) == int: spin = [spin]
-    return ell < abs(sum(spin))
 
-def forbidden_regularity(ell,regularity):
+def forbidden(ell,regularity,spin):
     if type(regularity) == int: regularity = [regularity]
+    if type(spin)       == int: spin       = [spin]
     
+    # test regularity
     walk = [ell]
     for r in regularity[::-1]:
         walk += [walk[-1] + r]
-        if walk[-1] < 0 or ((walk[-1] == 0) and (walk[-2] == 0)): return True
+        if walk[-1] < 0 or (walk[-1] == walk[-2] == 0):
+            return True
     
-    return False
+    # test spin
+    return ell < abs(sum(spin))
 
-def _swap(t,i,nu):
-    L = list(t)
-    L[i] = nu
-    return tuple(L)
+
+def _replace(t,i,nu):
+    return tuple(nu if i==j else t[j] for j in range(len(t)))
+
 
 def regularity2spinMap(ell,spin,regularity):
     
     if spin == (): return 1
     
-    if forbidden_spin(ell,spin) or forbidden_regularity(ell,regularity): return 0
+    if forbidden(ell,regularity,spin): return 0
     
     if type(spin) == int:
         order = 1
@@ -50,9 +51,9 @@ def regularity2spinMap(ell,spin,regularity):
     R = 0
     for i in range(order-1):
         if tau[i] == -sigma:
-            R -= regularity2spinMap(ell,_swap(tau,i,0),b)
+            R -= regularity2spinMap(ell,_replace(tau,i,0),b)
         if tau[i] == 0:
-            R += regularity2spinMap(ell,_swap(tau,i,sigma),b)
+            R += regularity2spinMap(ell,_replace(tau,i,sigma),b)
 
     Qold   = regularity2spinMap(ell,tau,b)
 
