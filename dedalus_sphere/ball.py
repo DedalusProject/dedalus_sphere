@@ -18,7 +18,7 @@ def quadrature(dimension,Nmax,alpha=alpha,**kw):
 def trial_functions(dimension,Nmax,ell,degree,z,alpha=alpha):
 
 
-    a, b, N = _regularity2Jacobi(dimension,Nmax,0,ell,degree,alpha=alpha)
+    a, b, N = _regularity2Jacobi_func(dimension,Nmax,0,ell,degree,alpha=alpha)
 
     init = jacobi.envelope(a,b,a,dimension/2-1,z)
     return jacobi.recursion(N,a,b,z,init)
@@ -34,13 +34,14 @@ def operator(dimension,op,Nmax,k,ell,degree,radius=1,pad=0,alpha=alpha):
           'Z' : ('J',1),                      # z = 2*(r/R)**2 - 1 multiplication
           'I' : ('I',1),                      # identity
           'E' : ('A+',1),                     # conversion
+          '0' : ('0',1),                      # zeros
         'r=R' : ('z=+1',2**((ell+degree)/2))} # boundary restriction
                                       
-    a, b, N = _regularity2Jacobi(dimension,Nmax+pad,k,ell,degree,alpha=alpha)
+    a, b, N = _regularity2Jacobi_op(dimension,Nmax+pad,k,ell,degree,alpha=alpha)
 
     return jacobi.operator(O[op][0],N,a,b,rescale=O[op][1])
 
-def _regularity2Jacobi(dimension,Nmax,k,ell,degree,alpha=alpha):
+def _regularity2Jacobi_func(dimension,Nmax,k,ell,degree,alpha=alpha):
 
     a = k + alpha
     b = ell + degree + dimension/2 - 1
@@ -48,4 +49,13 @@ def _regularity2Jacobi(dimension,Nmax,k,ell,degree,alpha=alpha):
 
     return a, b, n
 
+def _regularity2Jacobi_op(dimension,Nmax,k,ell,degree,alpha=alpha):
+
+    a = k + alpha
+    b = ell + degree + dimension/2 - 1
+    n = Nmax - Nmin(ell,0)
+
+    return a, b, n
+
 def Nmin(ell,degree): return max((ell + degree)//2,0)
+
