@@ -1,6 +1,5 @@
 import numpy             as np
-#from . import jacobi128  as jacobi
-import jacobi128  as jacobi
+from . import jacobi128  as jacobi
 
 # The defalut configurations for the base Jacobi parameter.
 alpha = 0
