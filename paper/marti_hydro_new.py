@@ -48,8 +48,7 @@ def matrices(N,l,nu):
         return M, L
 
     op = de.operators.convert(u, (bk2,))
-    op_matrices = op.expression_matrices(sp, (u,))
-    M00 = op_matrices[u]
+    M00 = op.subproblem_matrix(sp)
 
     M01 = de.operators.Zero(p, c, (c,)).subproblem_matrix(sp)
     M10 = de.operators.Zero(u, c, ()).subproblem_matrix(sp)
