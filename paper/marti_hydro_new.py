@@ -6,6 +6,7 @@ import numpy as np
 import scipy.sparse      as sparse
 from dedalus.extras.flow_tools import GlobalArrayReducer
 import dedalus.public as de
+from dedalus.tools import array
 from mpi4py import MPI
 import time
 import pickle
@@ -17,14 +18,8 @@ rank = MPI.COMM_WORLD.rank
 
 # Gives LHS matrices for hydro.
 
-def BC_rows(N,ell,deg):
-    N_list = (np.arange(len(deg))+1)*(N - ell//2 + 1)
-
-#    N_list = []
-#    for d in deg:
-#        N_list.append( N - max((ell + d)//2,0) + 1 )
-#    if len(deg) == 1: return N_list
-#    N_list = np.cumsum(N_list)
+def BC_rows(N,ell,num_comp):
+    N_list = (np.arange(num_comp)+1)*(N - ell//2 + 1)
     return N_list
 
 class Subproblem:
@@ -41,10 +36,10 @@ def matrices(N,l,nu):
         cd = (2,       l+deg+0.5)
         return jacobi.coefficient_connection(N - l//2,ab,cd)
 
-    N0, N1, N2, N3 = BC_rows(N,l,[-1,+1,0,0])
+    N0, N1, N2, N3 = BC_rows(N,l,4)
 
     if l == 0: #+3 is for tau rows
-        N0, N1 = BC_rows(N,l,[+1,0])
+        N0, N1 = BC_rows(N,l,2)
         M = ball.operator(3,'0',N1-1+3,0,l,0).tocsr()
         L = ball.operator(3,'I',N1-1+3,0,l,0).tocsr()
         return M, L
@@ -91,9 +86,6 @@ def matrices(N,l,nu):
     col0 = np.concatenate((                 tau0,np.zeros((N3-N0,1))))
     col1 = np.concatenate((np.zeros((N0,1)),tau1,np.zeros((N3-N1,1))))
     col2 = np.concatenate((np.zeros((N1,1)),tau2,np.zeros((N3-N2,1))))
-
-#    if l % 2 == 1:
-#        col0[-1] = 1.
 
     L = sparse.bmat([[   L, col0, col1, col2],
                      [row0,    0 ,   0,    0],
@@ -153,7 +145,7 @@ class StateVector:
                 components.append([i,(2,)])
         return components
 
-    def pack(self,fields,BCs):
+    def pack(self,fields,u_bc):
         for dl,l in enumerate(self.basis.local_l):
             for dm,m in enumerate(self.basis.local_m):
                 if m <= l:
@@ -163,8 +155,7 @@ class StateVector:
                         n_slice = self.basis.n_slice(field_component,l)
                         if n_slice is not None:
                             self.data[dl][dm][self.slices[dl][i]] = fields[field_num]['c'][field_component][dm,dl,n_slice]
-                    BC_len = BCs.shape[0]
-                    self.data[dl][dm][-BC_len:] = BCs[:,dm,dl]
+                    self.data[dl][dm][-3:] = u_bc['c'][:,dm,dl,0]
 
     def unpack(self,fields):
         for field in fields:
@@ -201,9 +192,10 @@ t_end = 20
 
 c = de.coords.SphericalCoordinates('phi', 'theta', 'r')
 d = de.distributor.Distributor(c.coords)
-b   = de.basis.BallBasis(c, (2*(Lmax+1),Lmax+1,Nmax+1), radius=1)
-bk1 = de.basis.BallBasis(c, (2*(Lmax+1),Lmax+1,Nmax+1), k=1, radius=1)
-bk2 = de.basis.BallBasis(c, (2*(Lmax+1),Lmax+1,Nmax+1), k=2, radius=1)
+b    = de.basis.BallBasis(c, (2*(Lmax+1),Lmax+1,Nmax+1), radius=1)
+bk1  = de.basis.BallBasis(c, (2*(Lmax+1),Lmax+1,Nmax+1), k=1, radius=1)
+bk2  = de.basis.BallBasis(c, (2*(Lmax+1),Lmax+1,Nmax+1), k=2, radius=1)
+b_S2 = b.S2_basis()
 phi, theta, r = b.local_grids((1, 1, 1))
 
 u = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
@@ -221,21 +213,14 @@ weight_theta = b.local_colatitude_weights(1)
 weight_r = b.local_radius_weights(1)
 
 # create boundary conditions
-u_bc = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
-u_bc['g'][2] = 0. # u_r = 0
-u_bc['g'][1] = - u0*r**2*np.cos(theta)*np.cos(phi)
-u_bc['g'][0] = u0*r**2*np.sin(phi)
+u_2D = de.field.Field(dist=d, bases=(b_S2,), tensorsig=(c,), dtype=np.complex128)
+u_2D['g'][2] = 0. # u_r = 0
+u_2D['g'][1] = - u0*np.cos(theta)*np.cos(phi)
+u_2D['g'][0] = u0*np.sin(phi)
 
-BC_shape = u_bc['c'][:,:,:,0].shape
-
-BCs = np.zeros(BC_shape, dtype=np.complex128)
-
-for dm, m in enumerate(b.local_m):
-    for dl, l in enumerate(b.local_l):
-        for i in range(3):
-            if l > 0:
-                n_slice = b.n_slice((i,),l)
-                BCs[i,dm,dl] = ball.operator(3,'r=R',Nmax,0,l,b.regtotal((i,))).astype(np.float64) @ u_bc['c'][i,dm,dl,n_slice]
+Q = b.radial_recombinations(u_2D.tensorsig)
+for dl, l in enumerate(b.local_l):
+    u_2D['c'][:,:,dl,0] = Q[dl].T @ u_2D['c'][:,:,dl,0]
 
 # build state vector
 state_vector = StateVector((u,p))
@@ -261,7 +246,7 @@ def nonlinear(state_vector, NL, t):
     state_vector.unpack((u,p))
     u_rhs = conv_op.evaluate()
     u_rhs['c'][:,:,0,:] = 0 # very important to zero out the ell=0 RHS
-    NL.pack((u_rhs,p_rhs),BCs)
+    NL.pack((u_rhs,p_rhs),u_2D)
 
 t_list = []
 E_list = []
