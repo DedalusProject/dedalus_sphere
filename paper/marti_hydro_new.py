@@ -47,9 +47,9 @@ def matrices(N,l,nu):
     op = de.operators.convert(u, (bk2,))
     M00 = op.subproblem_matrix(sp)
 
-    M01 = de.operators.Zero(p, c, (c,)).subproblem_matrix(sp)
-    M10 = de.operators.Zero(u, c, ()).subproblem_matrix(sp)
-    M11 = de.operators.Zero(p, c, ()).subproblem_matrix(sp)
+    M01 = de.operators.ZeroMatrix(p, c, (c,)).subproblem_matrix(sp)
+    M10 = de.operators.ZeroMatrix(u, c, ()).subproblem_matrix(sp)
+    M11 = de.operators.ZeroMatrix(p, c, ()).subproblem_matrix(sp)
 
     M=sparse.bmat([[M00,M01],
                    [M10,M11]])
@@ -64,16 +64,19 @@ def matrices(N,l,nu):
     op = de.operators.Divergence(u)
     L10 = op.subproblem_matrix(sp)
 
-    L11 = de.operators.Zero(p, c, ()).subproblem_matrix(sp)
+    L11 = de.operators.ZeroMatrix(p, c, ()).subproblem_matrix(sp)
 
     L=sparse.bmat([[L00,L01],
                    [L10,L11]])
 
     L = L.tocsr()
 
-    row0=np.concatenate((             ball.operator(3,'r=R',N,0,l,-1),np.zeros(N3-N0)))
-    row1=np.concatenate((np.zeros(N0),ball.operator(3,'r=R',N,0,l,+1),np.zeros(N3-N1)))
-    row2=np.concatenate((np.zeros(N1),ball.operator(3,'r=R',N,0,l, 0),np.zeros(N3-N2)))
+    op = de.operators.interpolate(u,r=1)
+    R = op.subproblem_matrix(sp)
+    Z = de.operators.ZeroVector(p, c, (c,)).subproblem_matrix(sp)
+    B_rows=np.bmat([[R, Z]])
+
+    Z = np.zeros((3,1))
 
     tau0 = (C(-1))[:,-1]
     tau1 = (C(+1))[:,-1]
@@ -87,15 +90,11 @@ def matrices(N,l,nu):
     col1 = np.concatenate((np.zeros((N0,1)),tau1,np.zeros((N3-N1,1))))
     col2 = np.concatenate((np.zeros((N1,1)),tau2,np.zeros((N3-N2,1))))
 
-    L = sparse.bmat([[   L, col0, col1, col2],
-                     [row0,    0 ,   0,    0],
-                     [row1,    0 ,   0,    0],
-                     [row2,    0,    0,    0]])
+    L = sparse.bmat([[     L, col0, col1, col2],
+                     [B_rows,    Z ,   Z,    Z]])
 
-    M = sparse.bmat([[     M, 0*col0, 0*col1, 0*col2],
-                     [0*row0,      0 ,     0,      0],
-                     [0*row1,      0 ,     0,      0],
-                     [0*row2,      0,      0,      0]])
+    M = sparse.bmat([[       M, 0*col0, 0*col1, 0*col2],
+                     [0*B_rows,      Z ,     Z,      Z]])
 
     L = L.tocsr()
     M = M.tocsr()
@@ -217,10 +216,6 @@ u_2D = de.field.Field(dist=d, bases=(b_S2,), tensorsig=(c,), dtype=np.complex128
 u_2D['g'][2] = 0. # u_r = 0
 u_2D['g'][1] = - u0*np.cos(theta)*np.cos(phi)
 u_2D['g'][0] = u0*np.sin(phi)
-
-Q = b.radial_recombinations(u_2D.tensorsig)
-for dl, l in enumerate(b.local_l):
-    u_2D['c'][:,:,dl,0] = Q[dl].T @ u_2D['c'][:,:,dl,0]
 
 # build state vector
 state_vector = StateVector((u,p))
