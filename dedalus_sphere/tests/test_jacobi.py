@@ -6,7 +6,7 @@ import numpy as np
 from dedalus_sphere import jacobi128
 
 
-N_range = [1,2,3,4,8,16]
+N_range = [1, 2, 3, 4, 8, 16]
 ab_range = [-0.5, 0, 0.5, 1]
 
 
@@ -74,4 +74,36 @@ def test_Bp_loop(N, a, b):
     conversion = jacobi128.operator('B+', N, a, b)
     backward = polynomials1.T.copy()
     assert np.allclose(backward @ conversion @ forward, np.identity(N+1))
+
+
+@pytest.mark.parametrize('N', N_range)
+@pytest.mark.parametrize('a', ab_range)
+@pytest.mark.parametrize('b', ab_range)
+def test_Ap_Bp_commutation(N, a, b):
+    # Build matrices
+    Ap00 = jacobi128.operator('A+', N, a, b)
+    Bp10 = jacobi128.operator('B+', N, a+1, b)
+    path1 = Bp10 @ Ap00
+    Bp00 = jacobi128.operator('B+', N, a, b)
+    Ap01 = jacobi128.operator('A+', N, a, b+1)
+    path2 = Ap01 @ Bp00
+    assert np.allclose(path1.A, path2.A)
+
+
+@pytest.mark.parametrize('N', N_range)
+@pytest.mark.parametrize('a', ab_range)
+@pytest.mark.parametrize('b', ab_range)
+def test_App_Bpp_commutation(N, a, b):
+    # Build matrices
+    Ap00 = jacobi128.operator('A+', N, a, b)
+    Ap10 = jacobi128.operator('A+', N, a+1, b)
+    Bp20 = jacobi128.operator('B+', N, a+2, b)
+    Bp21 = jacobi128.operator('B+', N, a+2, b+1)
+    path1 = Bp21 @ Bp20 @ Ap10 @ Ap00
+    Bp00 = jacobi128.operator('B+', N, a, b)
+    Bp01 = jacobi128.operator('B+', N, a, b+1)
+    Ap02 = jacobi128.operator('A+', N, a, b+2)
+    Ap12 = jacobi128.operator('A+', N, a+1, b+2)
+    path2 = Ap12 @ Ap02 @ Bp01 @ Bp00
+    assert np.allclose(path1.A, path2.A)
 
