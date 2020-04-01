@@ -240,7 +240,8 @@ def nonlinear(state_vector, NL, t):
     # get U in coefficient space
     state_vector.unpack((u,p))
     u_rhs = conv_op.evaluate()
-    u_rhs['c'][:,:,0,:] = 0 # very important to zero out the ell=0 RHS
+    if 0 in b.local_l:
+        u_rhs['c'][:,:,0,:] = 0 # very important to zero out the ell=0 RHS
     NL.pack((u_rhs,p_rhs),u_2D)
 
 t_list = []
