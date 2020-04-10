@@ -32,14 +32,14 @@ def matrices(N, l, Ekman, Prandtl, Rayleigh):
 
     sp = Subproblem(l)
 
-    Z00 = de.operators.ZeroMatrix(u, c, (c,)).subproblem_matrix(sp)
-    Z01 = de.operators.ZeroMatrix(p, c, (c,)).subproblem_matrix(sp)
-    Z02 = de.operators.ZeroMatrix(T, c, (c,)).subproblem_matrix(sp)
-    Z10 = de.operators.ZeroMatrix(u, c, ()).subproblem_matrix(sp)
-    Z11 = de.operators.ZeroMatrix(p, c, ()).subproblem_matrix(sp)
-    Z12 = de.operators.ZeroMatrix(T, c, ()).subproblem_matrix(sp)
-    Z20 = de.operators.ZeroMatrix(u, c, ()).subproblem_matrix(sp)
-    Z21 = de.operators.ZeroMatrix(p, c, ()).subproblem_matrix(sp)
+    Z00 = de.operators.ZeroMatrix(u, (c,)).subproblem_matrix(sp)
+    Z01 = de.operators.ZeroMatrix(p, (c,)).subproblem_matrix(sp)
+    Z02 = de.operators.ZeroMatrix(T, (c,)).subproblem_matrix(sp)
+    Z10 = de.operators.ZeroMatrix(u, ()).subproblem_matrix(sp)
+    Z11 = de.operators.ZeroMatrix(p, ()).subproblem_matrix(sp)
+    Z12 = de.operators.ZeroMatrix(T, ()).subproblem_matrix(sp)
+    Z20 = de.operators.ZeroMatrix(u, ()).subproblem_matrix(sp)
+    Z21 = de.operators.ZeroMatrix(p, ()).subproblem_matrix(sp)
 
     if l == 0:
         N0, N1, N2 = BC_rows(N,l,3)
@@ -60,8 +60,8 @@ def matrices(N, l, Ekman, Prandtl, Rayleigh):
 
         op = de.operators.interpolate(T,r=1)
         R = op.subproblem_matrix(sp)
-        Z0 = de.operators.ZeroVector(u, c, ()).subproblem_matrix(sp)
-        Z1 = de.operators.ZeroVector(p, c, ()).subproblem_matrix(sp)
+        Z0 = de.operators.ZeroVector(u, ()).subproblem_matrix(sp)
+        Z1 = de.operators.ZeroVector(p, ()).subproblem_matrix(sp)
         B_rows=np.bmat([[Z0, Z1, R]])
 
         tau0 = C(0)[:,-1]
@@ -159,7 +159,7 @@ class StateVector:
     def __init__(self,fields):
         # get a list of fields
         # BCs is a function which returns the number of BCs for a given l
-        self.basis = fields[0].bases[0]
+        self.basis = fields[0].domain.bases[0]
         self.Nmax = self.basis.Nmax
         self.component_list = self.components(fields)
         self.data = []
