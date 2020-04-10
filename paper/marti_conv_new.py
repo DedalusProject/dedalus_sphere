@@ -100,27 +100,29 @@ def matrices(N, l, Ekman, Prandtl, Rayleigh):
 
     N0, N1, N2, N3, N4 = BC_rows(N,l,5)
 
-    Q = b.radial_recombinations((c,c,),ell_list=(l,))[0]
-    if l == 1: rDmm = 0.*b.operator_matrix('r=R',l,0)
-    else: rDmm = intertwiner.xi(-1,l-1)*b.operator_matrix('r=R',l,-2,dk=1) @ b.operator_matrix('D-',l,-1)
-    rDpm = intertwiner.xi(+1,l-1)*b.operator_matrix('r=R',l, 0,dk=1) @ b.operator_matrix('D+',l,-1)
-    rDm0 = intertwiner.xi(-1,l  )*b.operator_matrix('r=R',l,-1,dk=1) @ b.operator_matrix('D-',l, 0)
-    rDp0 = intertwiner.xi(+1,l  )*b.operator_matrix('r=R',l,+1,dk=1) @ b.operator_matrix('D+',l, 0)
-    rDmp = intertwiner.xi(-1,l+1)*b.operator_matrix('r=R',l, 0,dk=1) @ b.operator_matrix('D-',l,+1)
-    rDpp = intertwiner.xi(+1,l+1)*b.operator_matrix('r=R',l,+2,dk=1) @ b.operator_matrix('D+',l,+1)
+    op = de.operators.interpolate(T,r=1)
+    RT = op.subproblem_matrix(sp)
 
-    rD = np.array([rDmm, rDmp, rDm0, rDpm, rDpp, rDp0, 0.*rDmm, 0.*rDmm, 0.*rDmm])
-    QSm = Q[:,::3].dot(rD[::3])
-    QSp = Q[:,1::3].dot(rD[1::3])
-    QS0 = Q[:,2::3].dot(rD[2::3])
-    Q = b.radial_recombinations((c,),ell_list=(l,))[0]
-    u0m = Q[2,0]*b.operator_matrix('r=R',l,-1)
-    u0p = Q[2,1]*b.operator_matrix('r=R',l,+1)
+    op = de.operators.RadialComponent(de.operators.interpolate(u,r=1))
+    Rur = op.expression_matrices(sp, (u,))
+    Rur = Rur[u]
 
-    row0=np.concatenate(( QSm[2]+QSm[6], QSp[2]+QSp[6], QS0[2]+QS0[6], np.zeros(N4-N2)))
-    row1=np.concatenate(( u0m          , u0p          , np.zeros(N4-N1)))
-    row2=np.concatenate(( QSm[5]+QSm[7], QSp[5]+QSp[7], QS0[5]+QS0[7], np.zeros(N4-N2)))
-    row3=np.concatenate(( np.zeros(N3), b.operator_matrix('r=R',l,0) ))
+    stress = de.operators.Gradient(u, c) + de.operators.TransposeComponents(de.operators.Gradient(u, c))
+    op = de.operators.RadialComponent(de.operators.AngularComponent(de.operators.interpolate(stress,r=1), index=1))
+    RSF = op.expression_matrices(sp, (u,))
+    RSF = RSF[u]
+
+    Z0  = de.operators.ZeroVector(u, ()).subproblem_matrix(sp)
+    Z1  = de.operators.ZeroVector(p, ()).subproblem_matrix(sp)
+    Z2  = de.operators.ZeroVector(T, ()).subproblem_matrix(sp)
+    Z11 = de.operators.ZeroVector(p, (c.S2coordsys,)).subproblem_matrix(sp)
+    Z21 = de.operators.ZeroVector(T, (c.S2coordsys,)).subproblem_matrix(sp)
+
+    B_rows=np.bmat([[Rur,  Z1,  Z2],
+                    [RSF, Z11, Z21],
+                    [ Z0,  Z1,  RT]])
+
+    Z = np.zeros((4,1))
 
     tau0 = C(-1)[:,-1]
     tau1 = C( 0)[:,-1]
@@ -137,17 +139,11 @@ def matrices(N, l, Ekman, Prandtl, Rayleigh):
     col2 = np.concatenate((np.zeros((N1,1)),tau2,np.zeros((N4-N2,1))))
     col3 = np.concatenate((np.zeros((N3,1)),tau3))
 
-    L = sparse.bmat([[   L, col0, col1, col2, col3],
-                     [row0,    0 ,   0,    0,    0],
-                     [row1,    0 ,   0,    0,    0],
-                     [row2,    0,    0,    0,    0],
-                     [row3,    0,    0,    0,    0]])
+    L = sparse.bmat([[     L, col0, col1, col2, col3],
+                     [B_rows,    Z,    Z,    Z,    Z]])
 
-    M = sparse.bmat([[     M, 0*col0, 0*col1, 0*col2, 0*col3],
-                     [0*row0,      0,      0,      0,      0],
-                     [0*row1,      0,      0,      0,      0],
-                     [0*row2,      0,      0,      0,      0],
-                     [0*row3,      0,      0,      0,      0]])
+    M = sparse.bmat([[       M, 0*col0, 0*col1, 0*col2, 0*col3],
+                     [0*B_rows,      Z,      Z,      Z,      Z]])
 
     L = L.tocsr()
     M = M.tocsr()
@@ -244,7 +240,7 @@ dt = 8e-5
 t_end = 20
 
 c = de.coords.SphericalCoordinates('phi', 'theta', 'r')
-d = de.distributor.Distributor(c.coords)
+d = de.distributor.Distributor((c,))
 b    = de.basis.BallBasis(c, (2*(Lmax+1),Lmax+1,Nmax+1), radius=1)
 bk1  = de.basis.BallBasis(c, (2*(Lmax+1),Lmax+1,Nmax+1), k=1, radius=1)
 bk2  = de.basis.BallBasis(c, (2*(Lmax+1),Lmax+1,Nmax+1), k=2, radius=1)
@@ -256,6 +252,8 @@ weight_r = b.local_radius_weights(1)
 u = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
 p = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
 T = de.field.Field(dist=d, bases=(b,), dtype=np.complex128)
+
+u_ang = de.field.Field(dist=d, bases=(b,), tensorsig=(c.S2coordsys,), dtype=np.complex128)
 
 ez = de.field.Field(dist=d, bases=(b,), tensorsig=(c,), dtype=np.complex128)
 ez['g'][1] = -np.sin(theta)
