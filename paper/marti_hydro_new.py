@@ -47,9 +47,9 @@ def matrices(N,l,nu):
     op = de.operators.convert(u, (bk2,))
     M00 = op.subproblem_matrix(sp)
 
-    M01 = de.operators.ZeroMatrix(p, c, (c,)).subproblem_matrix(sp)
-    M10 = de.operators.ZeroMatrix(u, c, ()).subproblem_matrix(sp)
-    M11 = de.operators.ZeroMatrix(p, c, ()).subproblem_matrix(sp)
+    M01 = de.operators.ZeroMatrix(p, (c,)).subproblem_matrix(sp)
+    M10 = de.operators.ZeroMatrix(u, ()).subproblem_matrix(sp)
+    M11 = de.operators.ZeroMatrix(p, ()).subproblem_matrix(sp)
 
     M=sparse.bmat([[M00,M01],
                    [M10,M11]])
@@ -64,7 +64,7 @@ def matrices(N,l,nu):
     op = de.operators.Divergence(u)
     L10 = op.subproblem_matrix(sp)
 
-    L11 = de.operators.ZeroMatrix(p, c, ()).subproblem_matrix(sp)
+    L11 = de.operators.ZeroMatrix(p, ()).subproblem_matrix(sp)
 
     L=sparse.bmat([[L00,L01],
                    [L10,L11]])
@@ -73,7 +73,7 @@ def matrices(N,l,nu):
 
     op = de.operators.interpolate(u,r=1)
     R = op.subproblem_matrix(sp)
-    Z = de.operators.ZeroVector(p, c, (c,)).subproblem_matrix(sp)
+    Z = de.operators.ZeroVector(p, (c,)).subproblem_matrix(sp)
     B_rows=np.bmat([[R, Z]])
 
     Z = np.zeros((3,1))
@@ -106,7 +106,7 @@ class StateVector:
     def __init__(self,fields):
         # get a list of fields
         # BCs is a function which returns the number of BCs for a given l
-        self.basis = fields[0].bases[0]
+        self.basis = fields[0].domain.bases[0]
         self.Nmax = self.basis.Nmax
         self.component_list = self.components(fields)
         self.data = []
@@ -240,7 +240,8 @@ def nonlinear(state_vector, NL, t):
     # get U in coefficient space
     state_vector.unpack((u,p))
     u_rhs = conv_op.evaluate()
-    u_rhs['c'][:,:,0,:] = 0 # very important to zero out the ell=0 RHS
+    if 0 in b.local_l:
+        u_rhs['c'][:,:,0,:] = 0 # very important to zero out the ell=0 RHS
     NL.pack((u_rhs,p_rhs),u_2D)
 
 t_list = []
