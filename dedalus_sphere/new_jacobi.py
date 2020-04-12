@@ -49,10 +49,10 @@ class Operator():
         self.__arrow = arrow
     
     @property
-    def arrow(self): return self.__arrow
+    def func(self):  return self.__func
     
     @property
-    def func(self): return self.__func
+    def arrow(self): return self.__arrow
     
     def codomain(self,*args):
         return tuple(np.array(args) + np.array(self.arrow))
@@ -199,7 +199,7 @@ class LaguerreOperator():
         def C(n,a):
             
             if p == +1:
-                N = np.ones(n)
+                N = [np.ones(n)]
             if p == -1:
                 N = [np.arange(n) + a]
         
@@ -213,7 +213,7 @@ class LaguerreOperator():
         def D(n,a):
 
             if p == +1:
-                N = -np.ones(n)
+                N = [-np.ones(n)]
             if p == -1:
                 N = [np.arange(n) + 1]
 
