@@ -1,48 +1,84 @@
 import numpy             as np
-from scipy.sparse import dia_matrix as banded
+import scipy.sparse      as sparse
 
-def increment_n(func):
+default = lambda f: f
+dense   = lambda f: f.todense()
+banded  = sparse.dia_matrix
+row     = sparse.csr_matrix
+column  = sparse.csc_matrix
+
+formatter = dense
+
+def check_coefficient(func):
+    def wrapper(self,other):
+        if type(other) == Operator:
+            return self @ other - other @ self
+        if not type(other) in (int,float,complex):
+            raise TypeError('Only scalar multiplication defined.')
+        return func(self,other)
+    wrapper.__name__ = func.__name__
+    return wrapper
+
+def check_codomain(func):
+    def wrapper(self,other):
+        if not (self.arrow == other.arrow).all():
+            raise TypeError('Operators must have the same codomain.')
+        return func(self,other)
+    wrapper.__name__ = func.__name__
+    return wrapper
+
+def check_sign(func):
+    def wrapper(self,p):
+        if not p in (+1,-1): raise ValueError('Must ladder by +1 or -1.')
+        return func(self,int(p))
+    wrapper.__name__ = func.__name__
+    return wrapper
+
+def format(func):
     def wrapper(*args):
-        return func(int(args[0]+1),*args[1:])
+        return formatter(func(int(args[0]+1),*args[1:]))
     wrapper.__name__ = func.__name__
     return wrapper
 
 
 class Operator():
     
-    def __init__(self,function,step):
+    def __init__(self,function,arrow):
     
-        self.__func = function
-        self.__step = step
+        self.__func  = function
+        self.__arrow = arrow
     
     @property
-    def step(self): return self.__step
+    def arrow(self): return self.__arrow
     
     @property
     def func(self): return self.__func
-
+    
+    def codomain(self,*args):
+        return tuple(np.array(args) + np.array(self.arrow))
+    
     def __call__(self,*args):
         return self.func(*args)
     
     def __matmul__(self,other):
-        
-        def result(*args):
-            brgs = np.array(args) + other.step
-            return self.func(*brgs) @ other.func(*args)
-            
-        return Operator(result,self.step+other.step)
-     
+        def func(*args):
+            return self.func(*other.codomain(*args)) @ other.func(*args)
+
+        return Operator(func,self.arrow+other.arrow)
+    
+    @check_coefficient
     def __mul__(self,other):
+        def func(*args):
+            return other*self(*args)
+            
+        return Operator(func,self.arrow)
         
-        if type(other) == Operator:
-            return self @ other - other @ self
-        
-        if not type(other) in (int,float,complex):
-            raise TypeError('Only scalar multiplication defined.')
- 
-        def result(*args): return other*self(*args)
-        
-        return Operator(result,self.step)
+    @check_codomain
+    def __add__(self,other):
+        def func(*args):
+            return self(*args)+other(*args)
+            
+        return Operator(func,self.arrow)
         
     def __rmul__(self,other):
             return self*other
@@ -56,15 +92,6 @@ class Operator():
     def __neg__(self):
         return (-1)*self
     
-    def __add__(self,other):
-        
-        if not (self.step == other.step).all():
-            raise TypeError('Operators must have the same step.')
-            
-        def result(*args): return self(*args) + other(*args)
-        
-        return Operator(result,self.step)
-    
     def __sub__(self,other):
         return self + (-other)
         
@@ -77,49 +104,46 @@ class JacobiOperator():
                        "B":self.__B,
                        "C":self.__C,
                        "D":self.__D}[name]
-        
+    
+    @check_sign
     def __call__(self,p):
-        p = int(p)
-        if not p in (+1,-1):
-            return ValueError('Must ladder by +1 or -1.')
-            
         return Operator(*self.__func(p))
         
     def __A(self,p):
         
-        @increment_n
+        @format
         def A(n,a,b):
 
             N = np.arange(n)
-            D = 2*N+a+b+1
+            Q = 2*N+a+b+1
             N = {+1:[N+(a+b+1),-(N+b)],
                  -1:[2*(N+a),-2*(N+1)]}[p]
 
-            if a+b == -1: N[0][0], D[0] = 1/2, 1
+            if a+b == -1: N[0][0], Q[0] = 1/2, 1
 
-            return banded((np.array(N)/D,[0,p]),(n+(1-p)//2,n))
+            return banded((np.array(N)/Q,[0,p]),(n+(1-p)//2,n))
         
         return A, np.array([(1-p)//2,p,0])
 
     def __B(self,p):
         
-        @increment_n
+        @format
         def B(n,a,b):
             
             N = np.arange(n)
-            D = 2*N+a+b+1
+            Q = 2*N+a+b+1
             N = {+1:[N+(a+b+1),N+a],
                  -1:[2*(N+b),2*(N+1)]}[p]
 
-            if a+b == -1: N[0][0], D[0] = 1/2, 1
+            if a+b == -1: N[0][0], Q[0] = 1/2, 1
 
-            return banded((np.array(N)/D,[0,p]),(n+(1-p)//2,n))
+            return banded((np.array(N)/Q,[0,p]),(n+(1-p)//2,n))
 
         return B, np.array([(1-p)//2,0,p])
         
     def __C(self,p):
         
-        @increment_n
+        @format
         def C(n,a,b):
             
             N = [np.arange(n) + {+1:b,-1:a}[p]]
@@ -130,7 +154,7 @@ class JacobiOperator():
 
     def __D(self,p):
         
-        @increment_n
+        @format
         def D(n,a,b):
             
             N = [(np.arange(n) + {+1:a+b+1,-1:1}[p])*2**(-p)]
@@ -138,3 +162,113 @@ class JacobiOperator():
             return banded((N,[p]),(n-p,n))
         
         return D, np.array([-p,p,p])
+
+
+class LaguerreOperator():
+
+    def __init__(self,name):
+        
+        self.__func = {"A":self.__A,
+                       "C":self.__C,
+                       "D":self.__D}[name]
+        
+    @check_sign
+    def __call__(self,p):
+        return Operator(*self.__func(p))
+        
+    def __A(self,p):
+        
+        @format
+        def A(n,a):
+            
+            if p == +1:
+                N = np.ones(n)
+                N = [N,-N]
+            if p == -1:
+                N = np.arange(n)
+                N = [N+a,-(N+1)]
+
+            return banded((N,[0,p]),(n+(1-p)//2,n))
+            
+        return A, np.array([(1-p)//2,p])
+        
+    
+    def __C(self,p):
+        
+        @format
+        def C(n,a):
+            
+            if p == +1:
+                N = np.ones(n)
+            if p == -1:
+                N = [np.arange(n) + a]
+        
+            return banded((N,[0]),(n,n))
+            
+        return C, np.array([0,p])
+    
+    def __D(self,p):
+        
+        @format
+        def D(n,a):
+
+            if p == +1:
+                N = -np.ones(n)
+            if p == -1:
+                N = [np.arange(n) + 1]
+
+            return banded((N,[p]),(n-p,n))
+            
+        return D, np.array([-p,p])
+        
+
+class HermiteOperator():
+
+def __init__(self,name):
+    
+    self.__func = {"A":self.__A,
+                   "D":self.__D}[name]
+    
+    @check_sign
+    def __call__(self,p):
+        return Operator(*self.__func(p))
+        
+    def __A(self,p):
+        
+        @format
+        def A(n):
+            
+            
+            
+            return banded((N,[0,p]),(n+(1-p)//2,n))
+            
+        return A, np.array([(1-p)//2,p])
+        
+
+    def __C(self,p):
+        
+        @format
+        def C(n,a):
+            
+            if p == +1:
+                N = np.ones(n)
+            if p == -1:
+                N = [np.arange(n) + a]
+        
+            return banded((N,[0]),(n,n))
+            
+        return C, np.array([0,p])
+
+    def __D(self,p):
+        
+        @format
+        def D(n,a):
+
+            if p == +1:
+                N = -np.ones(n)
+            if p == -1:
+                N = [np.arange(n) + 1]
+
+            return banded((N,[p]),(n-p,n))
+            
+        return D, np.array([-p,p])
