@@ -9,22 +9,22 @@ column  = sparse.csc_matrix
 
 formatter = dense
 
-def check_coefficient(func):
+def check_coefficient(multiply):
     def wrapper(self,other):
         if type(other) == Operator:
             return self @ other - other @ self
         if not type(other) in (int,float,complex):
             raise TypeError('Only scalar multiplication defined.')
-        return func(self,other)
-    wrapper.__name__ = func.__name__
+        return multiply(self,other)
+    wrapper.__name__ = multiply.__name__
     return wrapper
 
-def check_codomain(func):
+def check_codomain(add):
     def wrapper(self,other):
-        if not (self.arrow == other.arrow).all():
-            raise TypeError('Operators must have the same codomain.')
-        return func(self,other)
-    wrapper.__name__ = func.__name__
+        if not (self.indices == other.indices).all():
+            raise TypeError('Operators must have compatible codomains.')
+        return add(self,other)
+    wrapper.__name__ = add.__name__
     return wrapper
 
 def check_sign(func):
@@ -54,6 +54,12 @@ class Operator():
     @property
     def arrow(self): return self.__arrow
     
+    @property
+    def degree(self): return self.arrow[0]
+    
+    @property
+    def indices(self): return self.arrow[1:]
+    
     def codomain(self,*args):
         return tuple(np.array(args) + np.array(self.arrow))
     
@@ -76,10 +82,18 @@ class Operator():
     @check_codomain
     def __add__(self,other):
         def func(*args):
-            return self(*args)+other(*args)
+            return self.__embedded_sum(self(*args),other(*args))
+        arrow = self.arrow
+        arrow[0] = max(self.degree,other.degree)
+        return Operator(func,arrow)
+    
+    def __embedded_sum(self,*M):
+        n = (M[0].shape[0], M[1].shape[0])
+        if  n[0] == n[1]: return M[0] + M[1]
+        i = n.index(max(n))
+        M[i][:n[1-i]] = M[i][:n[1-i]] + M[1-i][:n[1-i]]
+        return M[i]
             
-        return Operator(func,self.arrow)
-        
     def __rmul__(self,other):
             return self*other
     
@@ -109,6 +123,7 @@ class JacobiOperator():
     def __call__(self,p):
         return Operator(*self.__func(p))
         
+    
     def __A(self,p):
         
         @format
@@ -169,13 +184,12 @@ class LaguerreOperator():
     def __init__(self,name):
         
         self.__func = {"A":self.__A,
-                       "C":self.__C,
                        "D":self.__D}[name]
         
     @check_sign
     def __call__(self,p):
         return Operator(*self.__func(p))
-        
+    
     def __A(self,p):
         
         @format
@@ -192,21 +206,6 @@ class LaguerreOperator():
             
         return A, np.array([(1-p)//2,p])
         
-    
-    def __C(self,p):
-        
-        @format
-        def C(n,a):
-            
-            if p == +1:
-                N = [np.ones(n)]
-            if p == -1:
-                N = [np.arange(n) + a]
-        
-            return banded((N,[0]),(n,n))
-            
-        return C, np.array([0,p])
-    
     def __D(self,p):
         
         @format
@@ -221,54 +220,27 @@ class LaguerreOperator():
             
         return D, np.array([-p,p])
         
-
+        
 class HermiteOperator():
 
-def __init__(self,name):
-    
-    self.__func = {"A":self.__A,
-                   "D":self.__D}[name]
-    
+    def __init__(self):
+        
+        self.__func = self.__D
+        
     @check_sign
     def __call__(self,p):
         return Operator(*self.__func(p))
         
-    def __A(self,p):
-        
-        @format
-        def A(n):
-            
-            
-            
-            return banded((N,[0,p]),(n+(1-p)//2,n))
-            
-        return A, np.array([(1-p)//2,p])
-        
-
-    def __C(self,p):
-        
-        @format
-        def C(n,a):
-            
-            if p == +1:
-                N = np.ones(n)
-            if p == -1:
-                N = [np.arange(n) + a]
-        
-            return banded((N,[0]),(n,n))
-            
-        return C, np.array([0,p])
-
     def __D(self,p):
-        
+
         @format
-        def D(n,a):
+        def D(n):
 
             if p == +1:
-                N = -np.ones(n)
+                N = [2*np.arange(n)]
             if p == -1:
-                N = [np.arange(n) + 1]
+                N = [np.ones(n)]
 
             return banded((N,[p]),(n-p,n))
             
-        return D, np.array([-p,p])
+        return D, np.array([-p])
