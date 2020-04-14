@@ -48,8 +48,6 @@ class Operator():
         self.__func  = function
         self.__arrow = arrow
     
-    @property
-    def func(self):  return self.__func
     
     @property
     def arrow(self): return self.__arrow
@@ -64,11 +62,11 @@ class Operator():
         return tuple(np.array(args) + np.array(self.arrow))
     
     def __call__(self,*args):
-        return self.func(*args)
+        return self.__func(*args)
     
     def __matmul__(self,other):
         def func(*args):
-            return self.func(*other.codomain(*args)) @ other.func(*args)
+            return self(*other.codomain(*args)) @ other(*args)
 
         return Operator(func,self.arrow+other.arrow)
     
