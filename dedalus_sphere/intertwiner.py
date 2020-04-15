@@ -33,13 +33,10 @@ def _replace(t,i,nu):
 
 
 def regularity2spinMap(ell,spin,regularity):
-    
+
     if spin == (): return 1
 
     if forbidden_spin(ell,spin) or forbidden_regularity(ell,regularity): return 0
-    
-    if len(spin) != len(regularity):
-        raise TypeError('spin and regularity must have the same length.')
     
     if type(spin) == int:
         order = 1
@@ -96,6 +93,9 @@ def index2tuple(index,order,indexing=(-1,1,0)):
 
 class NCCCoupling():
     
+    def int2tuple(func):
+        return lambda *args: func(*[(s,) if type(s)==int else s for s in args])
+    
     def __init__(self,ell,product_type,use_selection_rule=True):
         
         self.ell = ell
@@ -107,67 +107,79 @@ class NCCCoupling():
                       'VxV':self._V_x_V,
                       'VS' :self._V_S,
                       'T@V':self._T_dot_V,
-                      'ST' :self._S_T}[product_type]
+                      'V@T':self._V_dot_T,
+                      'ST' :self._S_T,
+                      'TS' :self._T_S,
+                      'VV' :self._V_V,
+                      'T@T':self._T_dot_T}[product_type]
     
-    def selection_rule(self,*abc):
-        allowed = not forbidden_regularity(0,abc[0])
-        a,b,c = tuple(sum(s) if type(s) != int else s for s in abc)
-        allowed = allowed and (a-abs(c-b)) % 2 == 0
-        return allowed
-        
+    
     def __call__(self,*abc):
         if not self.use_selection_rule or self.selection_rule(*abc):
             return self._func(*abc)
         return 0
         
-    def _Q3(self,sigma,tau,kappa,a,b,c):
-            Q = regularity2spinMap
-            return Q(self.ell,kappa,c)*Q(self.ell,tau,b)*Q(0,sigma,a)
+    @int2tuple
+    def selection_rule(self,*abc):
+        allowed = not forbidden_regularity(0,abc[0])
+        a,b,c = tuple(map(sum,abc))
+        return allowed and (a-abs(c-b)) % 2 == 0
         
     def _spins(self,rank):
         if rank == 1: return (-1,0,1)
         s = rank*((-1,0,1),)
         return product(*s)
     
-    def singleton2tuple(func):
-        def wrapper(*args):
-            return func(*tuple((s,) if type(s)==int else s for s in args))
-        return wrapper
+    @int2tuple
+    def _Q3(self,sigma,tau,kappa,a,b,c):
+        Q = regularity2spinMap
+        return Q(self.ell,kappa,c)*Q(self.ell,tau,b)*Q(0,sigma,a)
     
-    # scalar tensor/vector/scalar: (), (__,), (__,)
-    @singleton2tuple
+    # scalar tensor/vector/scalar
+    @int2tuple
     def _S_T(self,*abc):
         if abc[0] == () and abc[1] == abc[2] : return 1
-        raise TypeError('Incorrect regularity.')
+        return 0
 
-    # vector dot vector:  (_,), (_,), ()
-    @singleton2tuple
+    # vector dot vector
+    @int2tuple
     def _V_dot_V(self,*abc):
-        if len(abc[0]) == len(abc[1]) == 1 and abc[2] == ():
-            return sum(self._Q3((s,),(-s,),(),*abc) for s in self._spins(1))
-        raise TypeError('Incorrect regularity.')
+        return sum(self._Q3(s,-s,(),*abc) for s in self._spins(1))
         
-    # vector scalar: (_,), (), (_,)
-    @singleton2tuple
+    # vector scalar
+    @int2tuple
     def _V_S(self,*abc):
-        if len(abc[0]) == len(abc[2]) == 1 and abc[1] == ():
-            return sum(self._Q3((s,),(),(s,),*abc) for s in self._spins(1))
-        raise TypeError('Incorrect regularity.')
+        return sum(self._Q3(s,(),s,*abc) for s in self._spins(1))
         
-    # vector cross vector: (_,), (_,), (_,)
-    @singleton2tuple
+    # vector cross vector
+    @int2tuple
     def _V_x_V(self,*abc):
-        if len(abc[0]) == len(abc[1]) == len(abc[2]) == 1:
-            E = lambda sig, tau: 1j*np.roll(self._spins(1),sig)[tau+1]
-            return sum(E(s,t)*self._Q3((s,),(t,),(s+t,),*abc) for s,t in self._spins(2))
-        raise TypeError('Incorrect regularity.')
-
-    # tensor dot vector: (_,_), (_,) (_,)
-    @singleton2tuple
-    def _T_dot_V(self,*abc):
-        if len(abc[0]) == 2 and len(abc[1]) == len(abc[2]) == 1:
-            return sum(self._Q3((t,-s),(s,),(t,),*abc) for s,t in self._spins(2))
-        raise TypeError('Incorrect regularity.')
+        E = lambda s, t: 1j*np.roll(self._spins(1),s)[t+1]
+        return sum(E(s,t)*self._Q3(s,t,s+t,*abc) for s,t in self._spins(2))
         
+    # tensor dot vector
+    @int2tuple
+    def _T_dot_V(self,*abc):
+        return sum(self._Q3((s,-t),t,s,*abc) for s,t in self._spins(2))
+        
+    # vector dot tensor
+    @int2tuple
+    def _V_dot_T(self,*abc):
+        return sum(self._Q3(s,(-s,t),t,*abc) for s,t in self._spins(2))
+        
+    # tensor scalar
+    @int2tuple
+    def _T_S(self,*abc):
+        return sum(self._Q3((s,t),(),(s,t),*abc) for s,t in self._spins(2))
+        
+    # vector vector
+    @int2tuple
+    def _V_V(self,*abc):
+        return sum(self._Q3(s,t,(s,t),*abc) for s,t in self._spins(2))
+        
+    # tensor dot tensor
+    @int2tuple
+    def _T_dot_T(self,*abc):
+        return sum(self._Q3((s,t),(-t,u),(s,u),*abc) for s,t,u in self._spins(3))
     
     
