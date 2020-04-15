@@ -123,7 +123,7 @@ class NCCCoupling():
     def selection_rule(self,*abc):
         allowed = not forbidden_regularity(0,abc[0])
         a,b,c = tuple(map(sum,abc))
-        return allowed and (a-abs(c-b)) % 2 == 0
+        return allowed and (((a-abs(c-b)) % 2 == 0) and (a-abs(c-b) >= 0))
         
     def _spins(self,rank):
         if rank == 1: return (-1,0,1)
