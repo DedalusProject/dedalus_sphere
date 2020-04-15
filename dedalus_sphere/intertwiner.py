@@ -96,10 +96,11 @@ def index2tuple(index,order,indexing=(-1,1,0)):
 
 class NCCCoupling():
     
-    def __init__(self,ell,product_type):
+    def __init__(self,ell,product_type,use_selection_rule=True):
         
         self.ell = ell
-        
+        self.use_selection_rule = use_selection_rule
+
         self._func = {'SS' :self._S_T,
                       'V@V':self._V_dot_V,
                       'SV' :self._S_T,
@@ -107,11 +108,18 @@ class NCCCoupling():
                       'VS' :self._V_S,
                       'T@V':self._T_dot_V,
                       'ST' :self._S_T}[product_type]
+    
+    def selection_rule(self,*abc):
+        allowed = not forbidden_regularity(0,abc[0])
+        a,b,c = tuple(sum(s) if type(s) != int else s for s in abc)
+        allowed = allowed and (a-abs(c-b)) % 2 == 0
+        return allowed
         
-                  
     def __call__(self,*abc):
-        return self._func(*abc)
-
+        if not self.use_selection_rule or self.selection_rule(*abc):
+            return self._func(*abc)
+        return 0
+        
     def _Q3(self,sigma,tau,kappa,a,b,c):
             Q = regularity2spinMap
             return Q(self.ell,kappa,c)*Q(self.ell,tau,b)*Q(0,sigma,a)
@@ -120,28 +128,46 @@ class NCCCoupling():
         if rank == 1: return (-1,0,1)
         s = rank*((-1,0,1),)
         return product(*s)
-
+    
+    def singleton2tuple(func):
+        def wrapper(*args):
+            return func(*tuple((s,) if type(s)==int else s for s in args))
+        return wrapper
+    
     # scalar tensor/vector/scalar: (), (__,), (__,)
+    @singleton2tuple
     def _S_T(self,*abc):
-        if abc[2] == abc[1] and abc[0] == (): return 1
-        return 0
+        if abc[0] == () and abc[1] == abc[2] : return 1
+        raise TypeError('Incorrect regularity.')
 
-    # vector dot vector:  (_,), (), (_,)
+    # vector dot vector:  (_,), (_,), ()
+    @singleton2tuple
     def _V_dot_V(self,*abc):
-        return sum(self._Q3((s,),(-s,),(),*abc) for s in self._spins(1))
-
-    # vector scalar: (_,), (_,), ()
-    def _V_S(self,*abc):
-        return sum(self._Q3((s,),(),(s,),*abc) for s in self._spins(1))
-
-    # vector cross vector: (_,), (_,), (_,)
-    def _V_x_V(self,*abc):
+        if len(abc[0]) == len(abc[1]) == 1 and abc[2] == ():
+            return sum(self._Q3((s,),(-s,),(),*abc) for s in self._spins(1))
+        raise TypeError('Incorrect regularity.')
         
-        E = lambda sig, tau: 1j*np.roll(self._spins(1),sig)[tau+1]
-            
-        return sum(E(s,t)*self._Q3((s,),(t,),(s+t,),*abc) for s,t in self._spins(2))
+    # vector scalar: (_,), (), (_,)
+    @singleton2tuple
+    def _V_S(self,*abc):
+        if len(abc[0]) == len(abc[2]) == 1 and abc[1] == ():
+            return sum(self._Q3((s,),(),(s,),*abc) for s in self._spins(1))
+        raise TypeError('Incorrect regularity.')
+        
+    # vector cross vector: (_,), (_,), (_,)
+    @singleton2tuple
+    def _V_x_V(self,*abc):
+        if len(abc[0]) == len(abc[1]) == len(abc[2]) == 1:
+            E = lambda sig, tau: 1j*np.roll(self._spins(1),sig)[tau+1]
+            return sum(E(s,t)*self._Q3((s,),(t,),(s+t,),*abc) for s,t in self._spins(2))
+        raise TypeError('Incorrect regularity.')
 
     # tensor dot vector: (_,_), (_,) (_,)
+    @singleton2tuple
     def _T_dot_V(self,*abc):
-        return sum(self._Q3((t,-s),(s,),(t,),*abc) for s,t in self._spins(2))
+        if len(abc[0]) == 2 and len(abc[1]) == len(abc[2]) == 1:
+            return sum(self._Q3((t,-s),(s,),(t,),*abc) for s,t in self._spins(2))
+        raise TypeError('Incorrect regularity.')
         
+    
+    
