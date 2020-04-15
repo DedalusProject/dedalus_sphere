@@ -1,4 +1,5 @@
 import numpy             as np
+from itertools import product 
 
 def xi(mu,ell):
     """
@@ -36,7 +37,10 @@ def regularity2spinMap(ell,spin,regularity):
     if spin == (): return 1
 
     if forbidden_spin(ell,spin) or forbidden_regularity(ell,regularity): return 0
-
+    
+    if len(spin) != len(regularity):
+        raise TypeError('spin and regularity must have the same length.')
+    
     if type(spin) == int:
         order = 1
         sigma, a = spin, regularity
@@ -89,3 +93,55 @@ def index2tuple(index,order,indexing=(-1,1,0)):
 
     return tuple(tup)
 
+
+class NCCCoupling():
+    
+    def __init__(self,ell,product_type):
+        
+        self.ell = ell
+        
+        self._func = {'SS' :self._S_T,
+                      'V@V':self._V_dot_V,
+                      'SV' :self._S_T,
+                      'VxV':self._V_x_V,
+                      'VS' :self._V_S,
+                      'T@V':self._T_dot_V,
+                      'ST' :self._S_T}[product_type]
+        
+                  
+    def __call__(self,*abc):
+        return self._func(*abc)
+
+    def _Q3(self,sigma,tau,kappa,a,b,c):
+            Q = regularity2spinMap
+            return Q(self.ell,kappa,c)*Q(self.ell,tau,b)*Q(0,sigma,a)
+        
+    def _spins(self,rank):
+        if rank == 1: return (-1,0,1)
+        s = rank*((-1,0,1),)
+        return product(*s)
+
+    # scalar tensor/vector/scalar: (), (__,), (__,)
+    def _S_T(self,*abc):
+        if abc[2] == abc[1] and abc[0] == (): return 1
+        return 0
+
+    # vector dot vector:  (_,), (), (_,)
+    def _V_dot_V(self,*abc):
+        return sum(self._Q3((s,),(-s,),(),*abc) for s in self._spins(1))
+
+    # vector scalar: (_,), (_,), ()
+    def _V_S(self,*abc):
+        return sum(self._Q3((s,),(),(s,),*abc) for s in self._spins(1))
+
+    # vector cross vector: (_,), (_,), (_,)
+    def _V_x_V(self,*abc):
+        
+        E = lambda sig, tau: 1j*np.roll((-1, 0, 1),sig)[tau+1]
+            
+        return sum(E(s,t)*self._Q3((s,),(t,),(s+t,),*abc) for s,t in self._spins(2))
+
+    # tensor dot vector: (_,_), (_,) (_,)
+    def _T_dot_V(self,*abc):
+        return sum(self._Q3((t,-s),(s,),(t,),*abc) for s,t in self._spins(2))
+        
