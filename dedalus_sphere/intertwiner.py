@@ -137,7 +137,7 @@ class NCCCoupling():
     # vector cross vector: (_,), (_,), (_,)
     def _V_x_V(self,*abc):
         
-        E = lambda sig, tau: 1j*np.roll((-1, 0, 1),sig)[tau+1]
+        E = lambda sig, tau: 1j*np.roll(self._spins(1),sig)[tau+1]
             
         return sum(E(s,t)*self._Q3((s,),(t,),(s+t,),*abc) for s,t in self._spins(2))
 
