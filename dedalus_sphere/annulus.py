@@ -2,7 +2,7 @@ import numpy             as np
 from . import jacobi128  as jacobi
 
 # The defalut configurations for the base Jacobi parameters.
-alpha = np.array([-0.5,-0.5])
+alpha = (-0.5,-0.5)
 
 def quadrature(Nmax,alpha=alpha,**kw):
     return jacobi.quadrature(Nmax,alpha[0],alpha[1],**kw)
@@ -13,7 +13,7 @@ def trial_functions(Nmax,z,alpha=alpha):
     return jacobi.recursion(Nmax,alpha[0],alpha[1],z,init)
 
 def operator(dimension,op,Nmax,k,ell,radii,pad=0,alpha=alpha):
-    """Pad the matrices by a safe amount before outputting the correct size."""
+    # Pad the matrices by a safe amount before outputting the correct size.
     
     if radii[1] <= radii[0]: raise ValueError('Inner radius must be greater than outer radius.')
     
@@ -45,6 +45,7 @@ def operator(dimension,op,Nmax,k,ell,radii,pad=0,alpha=alpha):
     if op == 'D+': return (D - (ell+k+1          )*E)[:N+1,:N+1]/gapwidth
     if op == 'D-': return (D + (ell-k+dimension-3)*E)[:N+1,:N+1]/gapwidth
     
+    # restriction
     if op == 'r=Ri': return jacobi.operator('z=-1',N,a,b)
     if op == 'r=Ro': return jacobi.operator('z=+1',N,a,b)
 

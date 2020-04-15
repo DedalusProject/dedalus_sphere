@@ -126,7 +126,7 @@ class JacobiOperator():
         
         @format
         def A(n,a,b):
-
+            
             N = np.arange(n)
             Q = 2*N+a+b+1
             N = {+1:[N+(a+b+1),-(N+b)],
