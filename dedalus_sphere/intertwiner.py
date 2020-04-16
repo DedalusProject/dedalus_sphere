@@ -130,8 +130,8 @@ class LinearTensorOperator():
      
     # tensor -> tensor
     @int2tuple
-    def __Transpose(self,*ab):
-        return sum(self.__Q2((s,t),(t,s),*ab) for s,t in indices(2))
+    def __Transpose(self,*ab,pi = lambda s: (s[1],s[0])):
+        return sum(self.__Q2(sig,pi(sig),*ab) for sig in indices(len(ab[0])))
     
     
 class NCCCoupling():
