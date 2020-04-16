@@ -91,10 +91,50 @@ def index2tuple(index,rank,indexing=(-1,1,0)):
     return tuple(tup)
 
 
-class NCCCoupling():
+def int2tuple(func):
+    return lambda *args: func(*[(s,) if type(s)==int else s for s in args])
+
+def indices(rank):
+    if rank == 1: return (-1,0,1)
+    return product(*(rank*((-1,0,1),)))
+
+
+class LinearTensorOperator():
     
-    def int2tuple(func):
-        return lambda *args: func(*[(s,) if type(s)==int else s for s in args])
+    def __init__(self,ell,operator_type):
+    
+        self.ell = ell
+        
+        self.__func = {'Trace'    :self.__Trace,
+                       'Cotrace'  :self.__Cotrace,
+                       'Transpose':self.__Transpose}[operator_type]
+    
+    
+    def __call__(self,*ab):
+        return self.__func(*ab)
+            
+    @int2tuple
+    def __Q2(self,sigma,tau,a,b):
+        Q = regularity2spinMap
+        return Q(self.ell,sigma,a)*Q(self.ell,tau,b)
+    
+    # tensor -> scalar
+    @int2tuple
+    def __Trace(self,*ab):
+        return sum(self.__Q2((s,-s),(),*ab) for s in indices(1))
+    
+    # scalar -> tensor
+    @int2tuple
+    def __Cotrace(self,*ab):
+        return self.__Trace(*(ab[1],ab[0]))
+     
+    # tensor -> tensor
+    @int2tuple
+    def __Transpose(self,*ab):
+        return sum(self.__Q2((s,t),(t,s),*ab) for s,t in indices(2))
+    
+    
+class NCCCoupling():
     
     def __init__(self,ell,product_type):
         
@@ -128,10 +168,6 @@ class NCCCoupling():
         d = a-abs(c-b)
         return (d >= 0) and (d % 2 == 0)
         
-    def _spins(self,rank):
-        if rank == 1: return (-1,0,1)
-        s = rank*((-1,0,1),)
-        return product(*s)
     
     @int2tuple
     def __Q3(self,sigma,tau,kappa,a,b,c):
@@ -162,26 +198,26 @@ class NCCCoupling():
     # tensor dot vector
     @int2tuple
     def __T_dot_V(self,*abc):
-        return sum(self.__Q3((s,-s),s,s,*abc) for s in self._spins(1))
+        return sum(self.__Q3((s,-s),s,s,*abc) for s in indices(1))
         
     # vector dot tensor
     @int2tuple
     def __V_dot_T(self,*abc):
-        return sum(self.__Q3(0,(0,s),s,*abc) for s in self._spins(1))
+        return sum(self.__Q3(0,(0,s),s,*abc) for s in indices(1))
         
     # tensor scalar
     @int2tuple
     def __T_S(self,*abc):
-        return sum(self.__Q3((s,-s),(),(s,-s),*abc) for s in self._spins(1))
+        return sum(self.__Q3((s,-s),(),(s,-s),*abc) for s in indices(1))
         
     # vector vector
     @int2tuple
     def __V_V(self,*abc):
-        return sum(self.__Q3(0,s,(0,s),*abc) for s in self._spins(1))
+        return sum(self.__Q3(0,s,(0,s),*abc) for s in indices(1))
         
     # tensor dot tensor
     @int2tuple
     def __T_dot_T(self,*abc):
-        return sum(self.__Q3((s,-s),(s,t),(s,t),*abc) for s,t in self._spins(2))
+        return sum(self.__Q3((s,-s),(s,t),(s,t),*abc) for s,t in indices(2))
     
     
