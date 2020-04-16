@@ -133,7 +133,7 @@ class LinearTensorOperator():
      
     # tensor(rank) -> tensor(rank)
     def __Transpose(self,*ab,pi=lambda s:s[::-1]):
-        return sum(self.__Q2(sig,pi(sig),*ab) for sig in indices(len(ab[0])))
+        return sum(self.__Q2(s,pi(s),*ab) for s in indices(len(ab[0])))
     
     
 class NCCCoupling():
