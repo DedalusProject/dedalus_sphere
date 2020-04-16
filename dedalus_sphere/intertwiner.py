@@ -131,7 +131,7 @@ class NCCCoupling():
         return product(*s)
     
     @int2tuple
-    def ___Q3(self,sigma,tau,kappa,a,b,c):
+    def __Q3(self,sigma,tau,kappa,a,b,c):
         Q = regularity2spinMap
         return Q(self.ell,kappa,c)*Q(self.ell,tau,b)*Q(0,sigma,a)
     
