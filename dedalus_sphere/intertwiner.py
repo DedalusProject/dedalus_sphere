@@ -117,7 +117,11 @@ class NCCCoupling():
         if self.selection_rule(*abc):
             return self.__func(*abc)
         return 0
-        
+    
+    def seperate_regularity(self,*abc):
+        a,b,c = tuple(map(sum,abc))
+        return c-b, (a - abs(c-b))//2
+    
     @int2tuple
     def selection_rule(self,*abc):
         a,b,c = tuple(map(sum,abc))
