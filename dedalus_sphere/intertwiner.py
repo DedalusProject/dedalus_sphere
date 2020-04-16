@@ -134,7 +134,8 @@ class LinearTensorOperator():
         return self.__Trace(*(ab[1],ab[0]),contract=expand)
      
     # tensor(rank) -> tensor(rank)
-    def __Transpose(self,*ab,pi=lambda s:s[::-1]):
+    def __Transpose(self,*ab,permutation=(1,0)):
+        pi = lambda s: tuple(s[i] for i in permutation)
         return sum(self.__Q2(s,pi(s),*ab) for s in indices(len(ab[0])))
     
     
