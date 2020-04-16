@@ -116,15 +116,22 @@ class LinearTensorOperator():
         Q = regularity2spinMap
         return Q(self.ell,sigma,a)*Q(self.ell,tau,b)
     
-    # tensor -> scalar
-    def __Trace(self,*ab):
-        return sum(self.__Q2((s,-s),(),*ab) for s in indices(1))
+    # tensor(rank) -> tensor(rank-2)
+    def __Trace(self,*ab,contract=(0,1)):
+        i,j = min(contract), max(contract)
+        
+        @int2tuple
+        def in_(s) : return s[:j] + (-s[i],) + s[j:]
+        @int2tuple
+        def out(s) : return s[:i] + s[i+1:j-1] + s[j:]
+        
+        return sum(self.__Q2(in_(s),out(s),*ab) for s in indices(len(ab[0])-1))
     
-    # scalar -> tensor
-    def __Cotrace(self,*ab):
-        return self.__Trace(*(ab[1],ab[0]))
+    # tensor(rank) -> tensor(rank+2)
+    def __Cotrace(self,*ab,expand=(0,1)):
+        return self.__Trace(*(ab[1],ab[0]),contract=expand)
      
-    # tensor -> tensor
+    # tensor(rank) -> tensor(rank)
     def __Transpose(self,*ab,pi=lambda s:s[::-1]):
         return sum(self.__Q2(sig,pi(sig),*ab) for sig in indices(len(ab[0])))
     
