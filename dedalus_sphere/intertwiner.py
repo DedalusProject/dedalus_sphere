@@ -91,13 +91,13 @@ def index2tuple(index,rank,indexing=(-1,1,0)):
     return tuple(tup)
 
 
+def indices(rank,indexing=(-1,0,1)):
+    if rank == 1: return indexing
+    return product(*(rank*(indexing,)))
+
+
 def int2tuple(func):
     return lambda *args: func(*[(s,) if type(s)==int else s for s in args])
-
-def indices(rank):
-    if rank == 1: return (-1,0,1)
-    return product(*(rank*((-1,0,1),)))
-
 
 class LinearTensorOperator():
     
@@ -110,8 +110,8 @@ class LinearTensorOperator():
                        'Transpose':self.__Transpose}[operator_type]
     
     
-    def __call__(self,*ab):
-        return self.__func(*ab)
+    def __call__(self,*ab,**kwargs):
+        return self.__func(*ab,**kwargs)
             
     @int2tuple
     def __Q2(self,sigma,tau,a,b):
@@ -119,18 +119,15 @@ class LinearTensorOperator():
         return Q(self.ell,sigma,a)*Q(self.ell,tau,b)
     
     # tensor -> scalar
-    @int2tuple
     def __Trace(self,*ab):
         return sum(self.__Q2((s,-s),(),*ab) for s in indices(1))
     
     # scalar -> tensor
-    @int2tuple
     def __Cotrace(self,*ab):
         return self.__Trace(*(ab[1],ab[0]))
      
     # tensor -> tensor
-    @int2tuple
-    def __Transpose(self,*ab,pi = lambda s: (s[1],s[0])):
+    def __Transpose(self,*ab,pi=lambda s:s[::-1]):
         return sum(self.__Q2(sig,pi(sig),*ab) for sig in indices(len(ab[0])))
     
     
