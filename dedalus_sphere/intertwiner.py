@@ -118,6 +118,8 @@ class LinearTensorOperator():
     
     # tensor(rank) -> tensor(rank-2)
     def __Trace(self,*ab,contract=(0,1)):
+        
+        contract = [c if c >=0 else len(ab[0]) + c + 1 for c in contract]
         i,j = min(contract), max(contract)
         
         @int2tuple
