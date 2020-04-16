@@ -96,34 +96,33 @@ class NCCCoupling():
     def int2tuple(func):
         return lambda *args: func(*[(s,) if type(s)==int else s for s in args])
     
-    def __init__(self,ell,product_type,use_selection_rule=True):
+    def __init__(self,ell,product_type):
         
         self.ell = ell
-        self.use_selection_rule = use_selection_rule
         
-        self._func = {'SS' :self.__S_T,
-                      'V@V':self.__V_dot_V,
-                      'SV' :self.__S_T,
-                      'VxV':self.__V_x_V,
-                      'VS' :self.__V_S,
-                      'T@V':self.__T_dot_V,
-                      'V@T':self.__V_dot_T,
-                      'ST' :self.__S_T,
-                      'TS' :self.__T_S,
-                      'VV' :self.__V_V,
-                      'T@T':self.__T_dot_T}[product_type]
+        self.__func = {'SS' :self.__S_T,
+                       'V@V':self.__V_dot_V,
+                       'SV' :self.__S_T,
+                       'VxV':self.__V_x_V,
+                       'VS' :self.__V_S,
+                       'T@V':self.__T_dot_V,
+                       'V@T':self.__V_dot_T,
+                       'ST' :self.__S_T,
+                       'TS' :self.__T_S,
+                       'VV' :self.__V_V,
+                       'T@T':self.__T_dot_T}[product_type]
     
     
     def __call__(self,*abc):
-        if not self.use_selection_rule or self.selection_rule(*abc):
-            return self._func(*abc)
+        if self.selection_rule(*abc):
+            return self.__func(*abc)
         return 0
         
     @int2tuple
     def selection_rule(self,*abc):
-        allowed = not forbidden_regularity(0,abc[0])
         a,b,c = tuple(map(sum,abc))
-        return allowed and (((a-abs(c-b)) % 2 == 0) and (a-abs(c-b) >= 0))
+        d = a-abs(c-b)
+        return (d >= 0) and (d % 2 == 0)
         
     def _spins(self,rank):
         if rank == 1: return (-1,0,1)
