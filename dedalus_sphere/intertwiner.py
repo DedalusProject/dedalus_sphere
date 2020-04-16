@@ -100,18 +100,18 @@ class NCCCoupling():
         
         self.ell = ell
         self.use_selection_rule = use_selection_rule
-
-        self._func = {'SS' :self._S_T,
-                      'V@V':self._V_dot_V,
-                      'SV' :self._S_T,
-                      'VxV':self._V_x_V,
-                      'VS' :self._V_S,
-                      'T@V':self._T_dot_V,
-                      'V@T':self._V_dot_T,
-                      'ST' :self._S_T,
-                      'TS' :self._T_S,
-                      'VV' :self._V_V,
-                      'T@T':self._T_dot_T}[product_type]
+        
+        self._func = {'SS' :self.__S_T,
+                      'V@V':self.__V_dot_V,
+                      'SV' :self.__S_T,
+                      'VxV':self.__V_x_V,
+                      'VS' :self.__V_S,
+                      'T@V':self.__T_dot_V,
+                      'V@T':self.__V_dot_T,
+                      'ST' :self.__S_T,
+                      'TS' :self.__T_S,
+                      'VV' :self.__V_V,
+                      'T@T':self.__T_dot_T}[product_type]
     
     
     def __call__(self,*abc):
@@ -131,55 +131,54 @@ class NCCCoupling():
         return product(*s)
     
     @int2tuple
-    def _Q3(self,sigma,tau,kappa,a,b,c):
+    def ___Q3(self,sigma,tau,kappa,a,b,c):
         Q = regularity2spinMap
         return Q(self.ell,kappa,c)*Q(self.ell,tau,b)*Q(0,sigma,a)
     
     # scalar tensor/vector/scalar
     @int2tuple
-    def _S_T(self,*abc):
+    def __S_T(self,*abc):
         if abc[0] == () and abc[1] == abc[2] : return 1
         return 0
 
     # vector dot vector
     @int2tuple
-    def _V_dot_V(self,*abc):
-        return sum(self._Q3(s,-s,(),*abc) for s in self._spins(1))
+    def __V_dot_V(self,*abc):
+        return self.___Q3(0,0,(),*abc)
         
     # vector scalar
     @int2tuple
-    def _V_S(self,*abc):
-        return sum(self._Q3(s,(),s,*abc) for s in self._spins(1))
+    def __V_S(self,*abc):
+        return self.___Q3(0,(),0,*abc)
         
     # vector cross vector
     @int2tuple
-    def _V_x_V(self,*abc):
-        E = lambda s, t: 1j*np.roll(self._spins(1),s)[t+1]
-        return sum(E(s,t)*self._Q3(s,t,s+t,*abc) for s,t in self._spins(2))
+    def __V_x_V(self,*abc):
+        return 1j*(self.___Q3(0,+1,+1,*abc) - self.___Q3(0,-1,-1,*abc))
         
     # tensor dot vector
     @int2tuple
-    def _T_dot_V(self,*abc):
-        return sum(self._Q3((s,-t),t,s,*abc) for s,t in self._spins(2))
+    def __T_dot_V(self,*abc):
+        return sum(self.__Q3((s,-s),s,s,*abc) for s in self._spins(1))
         
     # vector dot tensor
     @int2tuple
-    def _V_dot_T(self,*abc):
-        return sum(self._Q3(s,(-s,t),t,*abc) for s,t in self._spins(2))
+    def __V_dot_T(self,*abc):
+        return sum(self.__Q3(0,(0,s),s,*abc) for s in self._spins(1))
         
     # tensor scalar
     @int2tuple
-    def _T_S(self,*abc):
-        return sum(self._Q3((s,t),(),(s,t),*abc) for s,t in self._spins(2))
+    def __T_S(self,*abc):
+        return sum(self.__Q3((s,-s),(),(s,-s),*abc) for s in self._spins(1))
         
     # vector vector
     @int2tuple
-    def _V_V(self,*abc):
-        return sum(self._Q3(s,t,(s,t),*abc) for s,t in self._spins(2))
+    def __V_V(self,*abc):
+        return sum(self.__Q3(0,s,(0,s),*abc) for s in self._spins(1))
         
     # tensor dot tensor
     @int2tuple
-    def _T_dot_T(self,*abc):
-        return sum(self._Q3((s,t),(-t,u),(s,u),*abc) for s,t,u in self._spins(3))
+    def __T_dot_T(self,*abc):
+        return sum(self.__Q3((s,-s),(s,t),(s,t),*abc) for s,t in self._spins(2))
     
     

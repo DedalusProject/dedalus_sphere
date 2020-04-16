@@ -112,11 +112,8 @@ class JacobiOperator():
     
     def __init__(self,name):
         
-        self.__func = {"A":self.__A,
-                       "B":self.__B,
-                       "C":self.__C,
-                       "D":self.__D}[name]
-    
+        self.__func = getattr(self,f'_JacobiOperator__{name}')
+        
     @check_sign
     def __call__(self,p):
         return Operator(*self.__func(p))
@@ -181,8 +178,7 @@ class LaguerreOperator():
 
     def __init__(self,name):
         
-        self.__func = {"A":self.__A,
-                       "D":self.__D}[name]
+        self.__func = getattr(self,f'_LaguerreOperator__{name}')
         
     @check_sign
     def __call__(self,p):
@@ -220,14 +216,10 @@ class LaguerreOperator():
         
         
 class HermiteOperator():
-
-    def __init__(self):
-        
-        self.__func = self.__D
         
     @check_sign
     def __call__(self,p):
-        return Operator(*self.__func(p))
+        return Operator(*self.__D(p))
         
     def __D(self,p):
 
