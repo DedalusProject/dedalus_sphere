@@ -31,7 +31,6 @@ def forbidden_regularity(ell,regularity):
 def _replace(t,i,nu):
     return tuple(nu if i==j else t[j] for j in range(len(t)))
 
-
 def regularity2spinMap(ell,spin,regularity):
 
     if spin == (): return 1
@@ -90,14 +89,13 @@ def index2tuple(index,rank,indexing=(-1,1,0)):
 
     return tuple(tup)
 
-
 def indices(rank,indexing=(-1,0,1)):
     if rank == 1: return indexing
     return product(*(rank*(indexing,)))
-
-
+    
 def int2tuple(func):
     return lambda *args: func(*[(s,) if type(s)==int else s for s in args])
+
 
 class LinearTensorOperator():
     
@@ -165,55 +163,45 @@ class NCCCoupling():
         d = a-abs(c-b)
         return (d >= 0) and (d % 2 == 0)
         
-    
     @int2tuple
     def __Q3(self,sigma,tau,kappa,a,b,c):
         Q = regularity2spinMap
         return Q(self.ell,kappa,c)*Q(self.ell,tau,b)*Q(0,sigma,a)
     
     # scalar tensor/vector/scalar
-    @int2tuple
     def __S_T(self,*abc):
         if abc[0] == () and abc[1] == abc[2] : return 1
         return 0
 
     # vector dot vector
-    @int2tuple
     def __V_dot_V(self,*abc):
         return self.__Q3(0,0,(),*abc)
         
     # vector scalar
-    @int2tuple
     def __V_S(self,*abc):
         return self.__Q3(0,(),0,*abc)
         
     # vector cross vector
-    @int2tuple
     def __V_x_V(self,*abc):
         return 1j*(self.__Q3(0,+1,+1,*abc) - self.__Q3(0,-1,-1,*abc))
         
     # tensor dot vector
-    @int2tuple
     def __T_dot_V(self,*abc):
         return sum(self.__Q3((s,-s),s,s,*abc) for s in indices(1))
         
     # vector dot tensor
-    @int2tuple
     def __V_dot_T(self,*abc):
         return sum(self.__Q3(0,(0,s),s,*abc) for s in indices(1))
         
     # tensor scalar
-    @int2tuple
     def __T_S(self,*abc):
         return sum(self.__Q3((s,-s),(),(s,-s),*abc) for s in indices(1))
         
     # vector vector
-    @int2tuple
     def __V_V(self,*abc):
         return sum(self.__Q3(0,s,(0,s),*abc) for s in indices(1))
         
     # tensor dot tensor
-    @int2tuple
     def __T_dot_T(self,*abc):
         return sum(self.__Q3((s,-s),(s,t),(s,t),*abc) for s,t in indices(2))
     
