@@ -144,17 +144,17 @@ class NCCCoupling():
     # vector dot vector
     @int2tuple
     def __V_dot_V(self,*abc):
-        return self.___Q3(0,0,(),*abc)
+        return self.__Q3(0,0,(),*abc)
         
     # vector scalar
     @int2tuple
     def __V_S(self,*abc):
-        return self.___Q3(0,(),0,*abc)
+        return self.__Q3(0,(),0,*abc)
         
     # vector cross vector
     @int2tuple
     def __V_x_V(self,*abc):
-        return 1j*(self.___Q3(0,+1,+1,*abc) - self.___Q3(0,-1,-1,*abc))
+        return 1j*(self.__Q3(0,+1,+1,*abc) - self.__Q3(0,-1,-1,*abc))
         
     # tensor dot vector
     @int2tuple
