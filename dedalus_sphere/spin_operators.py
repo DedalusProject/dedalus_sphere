@@ -24,7 +24,7 @@ def check_spins(spins,good=False):
     return None
 
 
-class SpinOperator():
+class SpinOperator(object):
     
     def __init__(self,func,arrow,spins=(-1,0,1)):
         
@@ -74,7 +74,7 @@ class SpinOperator():
     @property
     def T(self):
         def func(sigma,tau):
-            return self[tau,sigma].conjugate()
+            return self[tau,sigma]
         return SpinOperator(func,-self.arrow,self.spins)
     
     
@@ -98,6 +98,11 @@ class SpinOperator():
         
         return SpinOperator(func,self.arrow+other.arrow,self.spins)
     
+    def __array_ufunc__(self, *args):
+        if args[0] == np.matmul:
+            return (args[3].T @ args[2].T).T
+        pass
+        
     def __add__(self,other):
         
         if self.arrow != other.arrow:
@@ -118,7 +123,9 @@ class SpinOperator():
         
         return SpinOperator(func,self.arrow,self.spins)
     
+    
     def __rmul__(self,other):
+        
         return self*other
     
     def __truediv__(self,other):
