@@ -23,6 +23,23 @@ def check_spins(spins,good=False):
         
     return None
 
+def array_check(func):
+    def wrapper(self,other):
+        if type(other) == np.ndarray:
+            
+            n    = other.shape[0]
+            rank = log_(self.dimension,n)
+        
+            if n != self.dimension**rank:
+                raise TypeError('incompatible domain.')
+            
+            return eval(f"np.ndarray.{func.__name__}(self(rank),other)")
+        
+        return func(self,other)
+        wrapper.__name__ = func.__name__
+    return wrapper
+
+
 
 class SpinOperator(object):
     
@@ -32,9 +49,7 @@ class SpinOperator(object):
         
         self.__func  = func
         self.__arrow = arrow
-        
         self.__spins = spins
-    
     
     def __getitem__(self,item):
         return self.__func(item[0],item[1])
@@ -58,18 +73,12 @@ class SpinOperator(object):
         return tuple(self.dimension**r for r in self.ranks(rank))
     
     def __call__(self,rank):
-            
         r_out, r_in = self.ranks(rank)
-        
         M = np.zeros(self.shape(rank))
-
         for i, sigma in enumerate(indices(r_out,indexing=self.spins)):
             for j, tau in enumerate(indices(r_in,indexing=self.spins)):
-                
                 M[i,j] = self[sigma,tau]
-
         return M
-    
     
     @property
     def T(self):
@@ -77,55 +86,41 @@ class SpinOperator(object):
             return self[tau,sigma]
         return SpinOperator(func,-self.arrow,self.spins)
     
-    
+    @array_check
     def __matmul__(self,other):
-        
-        if type(other) == np.ndarray:
-            
-            n    = other.shape[0]
-            rank = log_(self.dimension,n)
-            
-            if n != self.dimension**rank:
-                raise TypeError('incompatible domain.')
-                
-            return self(rank) @ other
-        
         def func(sigma,tau):
-            
             K = indices(other.codomain(len(tau)),indexing=self.spins)
-            
             return sum(self[sigma,kappa]*other[kappa,tau] for kappa in K)
-        
         return SpinOperator(func,self.arrow+other.arrow,self.spins)
     
-    def __array_ufunc__(self, *args):
-        if args[0] == np.matmul:
-            return (args[3].T @ args[2].T).T
-        pass
-        
+    @array_check
     def __add__(self,other):
-        
         if self.arrow != other.arrow:
             raise TypeError('incompatible codomains')
             
         def func(sigma,tau):
             return self[sigma,tau] + other[sigma,tau]
-        
         return SpinOperator(func,self.arrow,self.spins)
     
+    @array_check
     def __mul__(self,other):
-        
-        if not type(other) in [int,float,complex]:
-            raise TypeError('only scalar multiplication allowed.')
-        
         def func(sigma,tau):
             return other*self[sigma,tau]
-        
         return SpinOperator(func,self.arrow,self.spins)
     
+    # right operations with np.ndarray
+    def __array_ufunc__(self, *args):
+        if args[0] == np.matmul:
+            return (args[3].T @ args[2].T).T
+        if args[0] == np.multiply:
+            return args[3]*args[2]
+        if args[0] == np.add:
+            return args[3]+args[2]
+        if args[0] == np.subtract:
+            return -args[3]+args[2]
+        pass
     
     def __rmul__(self,other):
-        
         return self*other
     
     def __truediv__(self,other):
@@ -200,7 +195,7 @@ class Trace(SpinOperator):
         
 
 class Rotation(SpinOperator):
-
+    
     def __init__(self,index=0,**kwargs):
         
         self.__index = index
