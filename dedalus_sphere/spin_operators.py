@@ -1,4 +1,5 @@
 from intertwiner import *
+from itertools import permutations
 
 # Helper functions
 dual   = lambda t: tuple(-e for e in t)
@@ -12,40 +13,26 @@ def log_(d,n,add=0):
         add += 1
     return add
 
-def check_spins(spins,good=False):
-    from itertools import permutations
-
-    for s in [(-1,1),(-1,0,1)]:
-        good = good or spins in list(permutations(s))
-
-    if not good:
-        raise TypeError('invalid spins.')
-        
-    return None
-
 def array_check(func):
     def wrapper(self,other):
         if type(other) == np.ndarray:
-            
             n    = other.shape[0]
             rank = log_(self.dimension,n)
-        
             if n != self.dimension**rank:
                 raise TypeError('incompatible domain.')
-            
             return eval(f"np.ndarray.{func.__name__}(self(rank),other)")
-        
         return func(self,other)
         wrapper.__name__ = func.__name__
     return wrapper
-
-
-
+    
 class SpinOperator(object):
     
     def __init__(self,func,arrow,spins=(-1,0,1)):
         
-        check_spins(spins)
+        good = False
+        for s in [(-1,1),(-1,0,1)]:
+            good = good or spins in list(permutations(s))
+        if not good: raise TypeError('invalid spins.')
         
         self.__func  = func
         self.__arrow = arrow
@@ -97,7 +84,6 @@ class SpinOperator(object):
     def __add__(self,other):
         if self.arrow != other.arrow:
             raise TypeError('incompatible codomains')
-            
         def func(sigma,tau):
             return self[sigma,tau] + other[sigma,tau]
         return SpinOperator(func,self.arrow,self.spins)
@@ -107,18 +93,6 @@ class SpinOperator(object):
         def func(sigma,tau):
             return other*self[sigma,tau]
         return SpinOperator(func,self.arrow,self.spins)
-    
-    # right operations with np.ndarray
-    def __array_ufunc__(self, *args):
-        if args[0] == np.matmul:
-            return (args[3].T @ args[2].T).T
-        if args[0] == np.multiply:
-            return args[3]*args[2]
-        if args[0] == np.add:
-            return args[3]+args[2]
-        if args[0] == np.subtract:
-            return -args[3]+args[2]
-        pass
     
     def __rmul__(self,other):
         return self*other
@@ -135,11 +109,21 @@ class SpinOperator(object):
     def __sub__(self,other):
         return self + (-other)
     
+    # right operations with np.ndarray
+    def __array_ufunc__(self, *args):
+        if args[0] == np.matmul:
+            return (args[3].T @ args[2].T).T
+        if args[0] == np.multiply:
+            return args[3]*args[2]
+        if args[0] == np.add:
+            return args[3]+args[2]
+        if args[0] == np.subtract:
+            return -args[3]+args[2]
+        pass
 
 class Identity(SpinOperator):
     
     def __init__(self,**kwargs):
-        
         SpinOperator.__init__(self,self.__identity,0,**kwargs)
     
     def __identity(self,sigma,tau):
@@ -151,7 +135,6 @@ class Identity(SpinOperator):
 class Metric(SpinOperator):
     
     def __init__(self,**kwargs):
-        
         SpinOperator.__init__(self,self.__metric,0,**kwargs)
     
     def __metric(self,sigma,tau):
@@ -163,11 +146,10 @@ class Metric(SpinOperator):
 class Transpose(SpinOperator):
     
     def __init__(self,permutation=(1,0),**kwargs):
+        SpinOperator.__init__(self,self.__transpose,0,**kwargs)
         
         self.__permutation = permutation
         
-        SpinOperator.__init__(self,self.__transpose,0,**kwargs)
-    
     @property
     def permutation(self): return self.__permutation
     
@@ -180,11 +162,10 @@ class Transpose(SpinOperator):
 class Trace(SpinOperator):
     
     def __init__(self,indices=(0,1),**kwargs):
-        
-        self.__indices = indices
-        
         SpinOperator.__init__(self,self.__trace,-len(indices),**kwargs)
     
+        self.__indices = indices
+        
     @property
     def indices(self): return self.__indices
     
@@ -197,11 +178,10 @@ class Trace(SpinOperator):
 class Rotation(SpinOperator):
     
     def __init__(self,index=0,**kwargs):
+        SpinOperator.__init__(self,self.__rotation,1,**kwargs)
         
         self.__index = index
         
-        SpinOperator.__init__(self,self.__rotation,1,**kwargs)
-    
     @property
     def index(self): return self.__index
 
@@ -211,13 +191,11 @@ class Rotation(SpinOperator):
 class TensorProduct(SpinOperator):
     
     def __init__(self,element,**kwargs):
-        
         if type(element) == int: element = (element,)
+        SpinOperator.__init__(self,self.__product,len(element),**kwargs)
         
         self.__element = element
         
-        SpinOperator.__init__(self,self.__product,len(element),**kwargs)
-    
     @property
     def element(self): return self.__element
 
