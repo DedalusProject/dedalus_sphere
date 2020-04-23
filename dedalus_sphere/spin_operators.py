@@ -77,6 +77,7 @@ class SpinOperator(object):
     def __matmul__(self,other):
         def func(sigma,tau):
             K = indices(other.codomain(len(tau)),indexing=self.spins)
+            
             return sum(self[sigma,kappa]*other[kappa,tau] for kappa in K)
         return SpinOperator(func,self.arrow+other.arrow,self.spins)
     
