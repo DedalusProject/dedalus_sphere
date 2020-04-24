@@ -210,9 +210,89 @@ class NCCCoupling():
     # vector vector
     def __V_V(self,*abc):
         return sum(self.__Q3(0,s,(0,s),*abc) for s in indices(1))
-        
+
     # tensor dot tensor
     def __T_dot_T(self,*abc):
         return sum(self.__Q3((s,-s),(s,t),(s,t),*abc) for s,t in indices(2))
     
-    
+
+def Q3(ell,sigma,tau,kappa,a,b,c):
+    Q = regularity2spinMap
+    return regularity2spinMap(0,sigma,a)*regularity2spinMap(ell,tau,b)*spin2regularityMap(ell,kappa,c)
+
+def index2spin(index, indexing=[-1,+1,0]):
+    return tuple( [indexing[i] for i in index] )
+
+def spin2index(spin, indexing=[2,1,0]):
+    return tuple( [indexing[s] for s in spin] )
+
+# S_ncc is an array of total spins of the NCC
+# S_in is an array of total spins of the input field
+# regindex_ncc is the regularity of the NCC
+# regindex_in is the regularity of the input field
+# regindex_out is the regularity of the output field
+class GammaNCC:
+
+    def __call__(self, ell, S_ncc, S_in, regindex_ncc, regindex_in, regindex_out):
+        gamma = 0
+        
+        for S_index_ncc, S_total_ncc in np.ndenumerate(S_ncc):
+            if S_total_ncc == 0:
+                for S_index_in, S_total_in in np.ndenumerate(S_in):
+                    if self._allowed(S_index_ncc, S_index_in):
+                        S_index_outs, coeffs = self._S_out(S_index_ncc, S_index_in)
+                        for S_index_out, coeff in zip(S_index_outs, coeffs):
+#                            print(index2spin(S_index_ncc),index2spin(S_index_in),index2spin(S_index_out))
+#                            print(index2spin(regindex_ncc), index2spin(regindex_in), index2spin(regindex_out))
+#                            print(coeff)
+#                            print(Q3(ell, index2spin(S_index_ncc), index2spin(S_index_in), index2spin(S_index_out),
+#                                              index2spin(regindex_ncc), index2spin(regindex_in), index2spin(regindex_out)))
+                            gamma += coeff*Q3(ell, index2spin(S_index_ncc), index2spin(S_index_in), index2spin(S_index_out),
+                                              index2spin(regindex_ncc), index2spin(regindex_in), index2spin(regindex_out))
+        return gamma
+
+# indices is a tuple of the indices to be contracted
+# ncc_first==True means NCC @ input; ncc_first==False means input @ NCC
+class GammaDotProduct(GammaNCC):
+
+    def __init__(self, indices, ncc_first=True, indexing=(-1,1,0)):
+        self.indices = indices
+        self.ncc_first = ncc_first
+        if ncc_first:
+            self.indices_ordered = indices
+        else:
+            self.indices_ordered = indices[::-1]
+        self.indexing = indexing
+
+    def _allowed(self, S_index_ncc, S_index_in):
+        return self.indexing[S_index_ncc[self.indices_ordered[0]]] == - self.indexing[S_index_in[self.indices_ordered[1]]]
+
+    def _S_out(self, S_index_ncc, S_index_in):
+        if self.ncc_first:
+            S_index0 = list(S_index_ncc)
+            S_index1 = list(S_index_in)
+        else:
+            S_index0 = list(S_index_in)
+            S_index1 = list(S_index_ncc)
+        S_index0.pop(self.indices[0])
+        S_index1.pop(self.indices[1])
+        S_out = tuple(S_index0 + S_index1)
+        return [S_out], [1.]
+
+class GammaTensorProduct(GammaNCC):
+
+    def __init__(self, ncc_first=True):
+        self.ncc_first = ncc_first
+
+    def _allowed(self, S_index_ncc, S_index_in):
+        return True
+
+    def _S_out(self, S_index_ncc, S_index_in):
+        if self.ncc_first:
+            S_index0 = list(S_index_ncc)
+            S_index1 = list(S_index_in)
+        else:
+            S_index0 = list(S_index_in)
+            S_index1 = list(S_index_ncc)
+        return [tuple(S_index0 + S_index1)], [1.]
+
