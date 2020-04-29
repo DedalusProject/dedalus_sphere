@@ -43,7 +43,6 @@ def grid_guess(Jacobi_matrix,symmetric=True):
        A normalised metric implies a self-adjoint matrix is symmetric.
 
     """
-
     if symmetric:
         J_banded = _sparse_symm_to_banded(Jacobi_matrix)
         return (np.sort(linear.eigvals_banded(J_banded).real)).astype(dtype)
@@ -176,9 +175,12 @@ def quadrature(max_degree,a,b,**kw):
         Show the error estimate in the grid values.
 
     """
-
     mu = mass(a,b)
     J  = operator('J',max_degree,a,b)
+    if max_degree == 0:
+        z = np.array([J[0,0]], dtype=dtype)
+        w = np.array([mu], dtype=dtype)
+        return z, w
     return gauss_quadrature(J,mass=mu,**kw)
 
 def envelope(a,b,a0,b0,z):
