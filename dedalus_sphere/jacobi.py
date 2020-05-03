@@ -186,7 +186,7 @@ class JacobiOperator():
         
             return banded((bands,[0,p]),(n+(1-p)//2,n))
         
-        return A, np.array([(1-p)//2,p,0])
+        return A, JacobiCodomain((1-p)//2,p,0,0)
 
     def __B(self,p):
         
@@ -206,7 +206,7 @@ class JacobiOperator():
                 
             return banded((bands,[0,p]),(n+(1-p)//2,n))
 
-        return B, np.array([(1-p)//2,0,p])
+        return B, JacobiCodomain((1-p)//2,0,p,0)
         
     def __C(self,p):
         
@@ -221,7 +221,7 @@ class JacobiOperator():
             
             return banded((bands,[0]),(n,n))
         
-        return C, np.array([0,p,-p])
+        return C, JacobiCodomain(0,p,-p,0)
 
     def __D(self,p):
         
@@ -236,9 +236,8 @@ class JacobiOperator():
             
             return banded((bands,[p]),(n-p,n))
         
-        return D, np.array([-p,p,p])
+        return D, JacobiCodomain(-p,p,p,0)
         
-    
     @staticmethod
     def identity(dtype=dtype):
         
@@ -248,8 +247,7 @@ class JacobiOperator():
             N = np.ones(n,dtype=dtype)
             return banded((N,[0]),(n,n))
             
-        return Operator(I,np.array([0,0,0]))
-    
+        return Operator(I,JacobiCodomain(0,0,0,0))
     
     @staticmethod
     def parity(dtype=dtype):
@@ -260,22 +258,57 @@ class JacobiOperator():
             N = np.arange(n,dtype=dtype)
             return banded(((-1)**N,[0]),(n,n))
         
-        # a,b -> b,a , z -> -z
-        # The arrow is not additive.
-        # which is not implimented in Operator.
-        # In general: parity @ A(p) @ parity ==  B(p)
-        #             parity @ C(p) @ parity ==  C(-p)
-        #             parity @ D(p) @ parity == -p*D(p)
-        return Operator(P, np.array([0,0,0]))
+        return Operator(P,JacobiCodomain(0,0,0,1))
         
         
-    @staticmethod
-    def zero(dtype=dtype):
+class JacobiCodomain():
+    
+    def __init__(self,dn,da,db,pi):
         
-        @format
-        def Z(n,a,b):
+        self.__map = (dn,da,db,pi)
+    
+    
+    def __getitem__(self,item):
+        return self.__map[(item)]
+    
+    def __str__(self):
+        return str(self[:])
+    
+    def __repr__(self):
+        return str(self)
+    
+    @property
+    def dn(self): return self[0]
+    
+    @property
+    def da(self): return self[1]
+    
+    @property
+    def db(self): return self[2]
+    
+    @property
+    def pi(self): return self[3]
+    
+    def __add__(self,other):
+        (dn,da,db) = self(*other[0:3])
+        dpi = (self.pi + other.pi) % 2
+        return JacobiCodomain(dn,da,db,dpi)
         
-            N = np.zeros(n,dtype=JacobiOperator.dtype)
-            return banded((N,[0]),(n,n))
+    def __call__(self,*args):
+        n,a,b = args
+        if self.pi:
+            a, b = b, a
+        return self[0]+n,self[1]+a,self[2]+b
+        
+    def __or__(self,other):
+        if self[1:] != other[1:]:
+            raise TypeError('Operators must have compatible codomains.')
+        
+        if self.dn > other.dn:
+            raise NotImplemented
             
-        return Operator(Z,np.array([0,0,0]))
+        if self.dn < other.dn:
+            raise NotImplemented
+        
+        return self
+    
