@@ -15,10 +15,9 @@ formatter = row
 
 def format(func):
     def wrapper(*args):
-        return formatter(func(int(args[0]+1),*args[1:]))
+        return formatter(func(*args))
     wrapper.__name__ = func.__name__
     return wrapper
-
 
 def polynomials(n,a,b,z,init=None,normalised=True,dtype=dtype,Newton=False):
 
@@ -53,7 +52,6 @@ def polynomials(n,a,b,z,init=None,normalised=True,dtype=dtype,Newton=False):
 
     return P[:n].astype(dtype)
 
-
 def quadrature(n,a,b,days=3,normalised=True,dtype=dtype):
     
     z = grid_guess(n,a,b,dtype=dtype)
@@ -69,18 +67,14 @@ def quadrature(n,a,b,days=3,normalised=True,dtype=dtype):
     
     return z.astype(dtype), w.astype(dtype)
 
-
 def grid_guess(n,a,b,dtype=dtype):
     return np.cos(np.pi*(np.arange(4*n-1,2,-4,dtype=dtype)+2*a)/(4*n+2*(a+b+1)))
- 
  
 def operator(name,normalised=True,dtype=dtype):
     if name == 'Id':
         return JacobiOperator.identity(dtype=dtype)
     if name == 'Pi':
         return JacobiOperator.parity(dtype=dtype)
-    if name == '0':
-        return JacobiOperator.zero(dtype=dtype)
     if name == 'Z':
         A = JacobiOperator('A',normalised=normalised,dtype=dtype)
         B = JacobiOperator('B',normalised=normalised,dtype=dtype)
@@ -152,38 +146,35 @@ class JacobiOperator():
     
     def __init__(self,name,normalised=True,dtype=dtype):
         
-        self.__name   = name
-        self.__func   = getattr(self,f'_{self.__class__.__name__}__{name}')
-        self.__normed = normalised
-        
-        
-    def __call__(self,p):
-        return Operator(*self.__func(p))
-    
+        self.__name       = name
+        self.__normalised = normalised
+        self.__function   = getattr(self,f'_JacobiOperator__{name}')
+                                                  
     @property
     def name(self):
         return self.__name
     
     @property
     def normalised(self):
-        return self.__normed
+        return self.__normalised
+    
+    def __call__(self,p):
+        return Operator(*self.__function(p))
     
     def __A(self,p):
         
         @format
         def A(n,a,b):
-            
+            if a+p <= -1:
+                return banded((np.zeros(n),[0]),(1,n))
             N = np.arange(n,dtype=self.dtype)
             bands = np.array({+1:[N+(a+b+1),  -(N+b)],
                               -1:[2*(N+a)  ,-2*(N+1)]}[p])
-                        
             bands[:,0] = 1/2 if a+b == -1 else bands[:,0]/(a+b+1)
             bands[:,1:] /= 2*N[1:]+a+b+1
-            
             if self.normalised:
                 bands[0] *= norm_ratio(0,p,0,N,a,b)
                 bands[1,(1+p)//2:] *= norm_ratio(-p,p,0,N[(1+p)//2:],a,b)
-        
             return banded((bands,[0,p]),(n+(1-p)//2,n))
         
         return A, JacobiCodomain((1-p)//2,p,0,0)
@@ -196,14 +187,13 @@ class JacobiOperator():
             N = np.arange(n,dtype=self.dtype)
             bands = np.array({+1:[N+(a+b+1),   N+a],
                               -1:[2*(N+b)  ,2*(N+1)]}[p])
-            
             bands[:,0] = 1/2 if a+b == -1 else bands[:,0]/(a+b+1)
             bands[:,1:] /= 2*N[1:]+a+b+1
-            
             if self.normalised:
                 bands[0] *= norm_ratio(0,0,p,N,a,b)
                 bands[1,(1+p)//2:] *= norm_ratio(-p,0,p,N[(1+p)//2:],a,b)
-                
+            if b+p <= -1:
+                bands = np.zeros(bands.shape)
             return banded((bands,[0,p]),(n+(1-p)//2,n))
 
         return B, JacobiCodomain((1-p)//2,0,p,0)
@@ -212,13 +202,12 @@ class JacobiOperator():
         
         @format
         def C(n,a,b):
-            
             N = np.arange(n,dtype=self.dtype)
             bands = np.array([N + {+1:b,-1:a}[p]])
-            
             if self.normalised:
                 bands[0] *= norm_ratio(0,p,-p,N,a,b)
-            
+            if a+p <= -1 or b-p <= -1:
+                bands = np.zeros(bands.shape)
             return banded((bands,[0]),(n,n))
         
         return C, JacobiCodomain(0,p,-p,0)
@@ -227,13 +216,12 @@ class JacobiOperator():
         
         @format
         def D(n,a,b):
-            
             N = np.arange(n,dtype=self.dtype)
             bands = np.array([(N + {+1:a+b+1,-1:1}[p])*2**(-p)])
-            
             if self.normalised:
                 bands[0,(1+p)//2:] *= norm_ratio(-p,p,p,N[(1+p)//2:],a,b)
-            
+            if a+p <= -1 or b+p <= -1:
+                bands *= 0
             return banded((bands,[p]),(n-p,n))
         
         return D, JacobiCodomain(-p,p,p,0)
@@ -243,7 +231,6 @@ class JacobiOperator():
         
         @format
         def I(n,a,b):
-        
             N = np.ones(n,dtype=dtype)
             return banded((N,[0]),(n,n))
             
@@ -254,7 +241,6 @@ class JacobiOperator():
         
         @format
         def P(n,a,b):
-        
             N = np.arange(n,dtype=dtype)
             return banded(((-1)**N,[0]),(n,n))
         
@@ -290,19 +276,22 @@ class JacobiCodomain():
     def pi(self): return self[3]
     
     def __add__(self,other):
-        (dn,da,db) = self(*other[0:3])
+        dn,da,db = self(*other[0:3])
         dpi = (self.pi + other.pi) % 2
         return JacobiCodomain(dn,da,db,dpi)
         
     def __call__(self,*args):
         n,a,b = args
         if self.pi:
-            a, b = b, a
-        return self[0]+n,self[1]+a,self[2]+b
-        
+            a,b = b,a
+        return self.dn + n, self.da + a, self.db + b
+    
+    def __eq__(self,other):
+        return self[1:] == other[1:]
+    
     def __or__(self,other):
-        if self[1:] != other[1:]:
-            raise TypeError('Operators must have compatible codomains.')
+        if self != other:
+            raise TypeError('operators have incompatible codomains.')
         
         if self.dn > other.dn:
             raise NotImplemented

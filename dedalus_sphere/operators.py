@@ -1,14 +1,4 @@
 
-def check_coefficient(multiply):
-    def wrapper(self,other):
-        if type(other) == Operator:
-            return self @ other - other @ self
-        if not type(other) in (int,float,complex):
-            raise TypeError('Only scalar multiplication defined.')
-        return multiply(self,other)
-    wrapper.__name__ = multiply.__name__
-    return wrapper
-
 class Operator():
     
     def __init__(self,function,codomain):
@@ -28,8 +18,9 @@ class Operator():
             return self(*other.codomain(*args)) @ other(*args)
         return Operator(function, self.codomain + other.codomain)
     
-    @check_coefficient
     def __mul__(self,other):
+        if type(other) == Operator:
+            return self @ other - other @ self
         def func(*args):
             return other*self(*args)
         return Operator(func,self.codomain)
