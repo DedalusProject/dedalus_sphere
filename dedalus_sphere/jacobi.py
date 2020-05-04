@@ -48,9 +48,12 @@ def quadrature(n,a,b,days=3,normalised=True,dtype=dtype):
     
     z = grid_guess(n,a,b,dtype=dtype)
     
-    for _ in range(days):
-        z, P = polynomials(n+1,a,b,z,Newton=True,normalised=normalised)
-    
+    if (a == b == -1/2) or (a == b == +1/2):
+        P = polynomials(n+1,a,b,z,normalised=normalised)
+    else:
+        for _ in range(days):
+            z, P = polynomials(n+1,a,b,z,Newton=True,normalised=normalised)
+        
     P[0] /= np.sqrt(np.sum(P**2,axis=0))
     w = P[0]**2
     
