@@ -158,7 +158,7 @@ class JacobiOperator():
         @format
         def A(n,a,b):
             if a+p <= -1:
-                return banded((np.zeros(n),[0]),(1,n))
+                return banded((n+(1-p)//2,n))
             N = np.arange(n,dtype=self.dtype)
             bands = np.array({+1:[N+(a+b+1),  -(N+b)],
                               -1:[2*(N+a)  ,-2*(N+1)]}[p])
@@ -175,7 +175,8 @@ class JacobiOperator():
         
         @format
         def B(n,a,b):
-            
+            if b+p <= -1:
+                return banded((n+(1-p)//2,n))
             N = np.arange(n,dtype=self.dtype)
             bands = np.array({+1:[N+(a+b+1),   N+a],
                               -1:[2*(N+b)  ,2*(N+1)]}[p])
@@ -184,8 +185,6 @@ class JacobiOperator():
             if self.normalised:
                 bands[0] *= norm_ratio(0,0,p,N,a,b)
                 bands[1,(1+p)//2:] *= norm_ratio(-p,0,p,N[(1+p)//2:],a,b)
-            if b+p <= -1:
-                bands = np.zeros(bands.shape)
             return banded((bands,[0,p]),(n+(1-p)//2,n))
 
         return B, JacobiCodomain((1-p)//2,0,p,0)
@@ -194,12 +193,12 @@ class JacobiOperator():
         
         @format
         def C(n,a,b):
+            if a+p <= -1 or b-p <= -1:
+                return banded((n,n))
             N = np.arange(n,dtype=self.dtype)
             bands = np.array([N + {+1:b,-1:a}[p]])
             if self.normalised:
                 bands[0] *= norm_ratio(0,p,-p,N,a,b)
-            if a+p <= -1 or b-p <= -1:
-                bands = np.zeros(bands.shape)
             return banded((bands,[0]),(n,n))
         
         return C, JacobiCodomain(0,p,-p,0)
@@ -208,12 +207,12 @@ class JacobiOperator():
         
         @format
         def D(n,a,b):
+            if a+p <= -1 or b+p <= -1:
+                return  banded((n-p,n))
             N = np.arange(n,dtype=self.dtype)
             bands = np.array([(N + {+1:a+b+1,-1:1}[p])*2**(-p)])
             if self.normalised:
                 bands[0,(1+p)//2:] *= norm_ratio(-p,p,p,N[(1+p)//2:],a,b)
-            if a+p <= -1 or b+p <= -1:
-                bands *= 0
             return banded((bands,[p]),(n-p,n))
         
         return D, JacobiCodomain(-p,p,p,0)
