@@ -1,3 +1,5 @@
+from scipy.sparse import csr_matrix
+from scipy.sparse import lil_matrix
 
 class Operator():
     
@@ -18,19 +20,19 @@ class Operator():
             return self(*other.codomain(*args)) @ other(*args)
         return Operator(function, self.codomain + other.codomain)
     
-    def __mul__(self,other):
-        if type(other) == Operator:
-            return self @ other - other @ self
-        def func(*args):
-            return other*self(*args)
-        return Operator(func,self.codomain)
-        
     def __add__(self,other):
         codomain = self.codomain | other.codomain
         def function(*args):
             return self(*args) + other(*args)
         return Operator(function, codomain)
     
+    def __mul__(self,other):
+        if type(other) == Operator:
+            return self @ other - other @ self
+        def function(*args):
+            return other*self(*args)
+        return Operator(function,self.codomain)
+
     def __rmul__(self,other):
             return self*other
     
@@ -47,3 +49,24 @@ class Operator():
         return self + (-other)
 
 
+class infinite_csr(csr_matrix):
+
+    def __init__(self,*args,**kwargs):
+        csr_matrix.__init__(self,*args,**kwargs)
+        
+    def __add__(self,other):
+        
+        ns, no = self.shape[0], other.shape[0]
+        
+        if ns == no:
+            sum_ = csr_matrix(self) + csr_matrix(other)
+        
+        if ns > no:
+            sum_ = lil_matrix(self)
+            sum_[:no] += other
+            
+        if ns < no:
+            sum_ = lil_matrix(other)
+            sum_[:ns] += self
+        
+        return infinite_csr(sum_)

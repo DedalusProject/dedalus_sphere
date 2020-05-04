@@ -1,21 +1,13 @@
 import numpy             as np
-import scipy.sparse      as sparse
+from scipy.sparse import dia_matrix as banded
 
-from operators import *
+from operators import infinite_csr, Operator
 
 dtype='float128'
 
-default = lambda f: f
-dense   = lambda f: f.todense()
-banded  = sparse.dia_matrix
-row     = sparse.csr_matrix
-column  = sparse.csc_matrix
-
-formatter = row
-
 def format(func):
     def wrapper(*args):
-        return formatter(func(*args))
+        return infinite_csr(func(*args))
     wrapper.__name__ = func.__name__
     return wrapper
 
@@ -250,9 +242,7 @@ class JacobiOperator():
 class JacobiCodomain():
     
     def __init__(self,dn,da,db,pi):
-        
         self.__map = (dn,da,db,pi)
-    
     
     def __getitem__(self,item):
         return self.__map[(item)]
@@ -263,28 +253,13 @@ class JacobiCodomain():
     def __repr__(self):
         return str(self)
     
-    @property
-    def dn(self): return self[0]
-    
-    @property
-    def da(self): return self[1]
-    
-    @property
-    def db(self): return self[2]
-    
-    @property
-    def pi(self): return self[3]
-    
     def __add__(self,other):
-        dn,da,db = self(*other[0:3])
-        dpi = (self.pi + other.pi) % 2
-        return JacobiCodomain(dn,da,db,dpi)
+        return JacobiCodomain(*self(*other[0:3]),self[3]^other[3])
         
     def __call__(self,*args):
         n,a,b = args
-        if self.pi:
-            a,b = b,a
-        return self.dn + n, self.da + a, self.db + b
+        if self[3]: a,b = b,a
+        return self[0] + n, self[1] + a, self[2] + b
     
     def __eq__(self,other):
         return self[1:] == other[1:]
@@ -292,12 +267,7 @@ class JacobiCodomain():
     def __or__(self,other):
         if self != other:
             raise TypeError('operators have incompatible codomains.')
-        
-        if self.dn > other.dn:
-            raise NotImplemented
-            
-        if self.dn < other.dn:
-            raise NotImplemented
-        
-        return self
+        if self[0] >= other[0]:
+            return self
+        return other
     
