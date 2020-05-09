@@ -156,7 +156,7 @@ def norm_ratio(dn,da,db,n,a,b,squared=False):
     
         N(n,a,b) = integrate_(-1,+1)( (1-z)**a (1+z)**b P(n,a,b,z)**2 )
     
-                                  Gamma(n+a+1) * Gamma(n+b+1)
+                                   Gamma(n+a+1) * Gamma(n+b+1)
         N(n,a,b) = 2**(a+b+1) * ----------------------------------
                                  (2n+a+b+1) * Gamma(n+a+b+1) * n!
     
@@ -372,7 +372,7 @@ class JacobiCodomain():
         return self.__map[(item)]
     
     def __str__(self):
-        s = f"(n->n+{self[0]},a->a+{self[1]},b->b+{self[2]})"
+        s = f'(n->n+{self[0]},a->a+{self[1]},b->b+{self[2]})'
         if self[3]: s = s.replace('a->a','a->b').replace('b->b','b->a')
         return s.replace('+0','').replace('+-','-')
         
