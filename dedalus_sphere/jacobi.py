@@ -9,6 +9,8 @@ def polynomials(n,a,b,z,init=None,normalised=True,dtype=dtype,Newton=False):
     """
     Jacobi polynomials of type (a,b) up to degree n-1.
     
+    Newton = True computes cubic-converging polish of P(n-1,a,b,z) = 0.
+    
     Parameters
     ----------
     a,b > -1
