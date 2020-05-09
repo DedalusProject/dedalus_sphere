@@ -6,6 +6,15 @@ from operators import infinite_csr, Operator
 dtype='float128'
 
 def polynomials(n,a,b,z,init=None,normalised=True,dtype=dtype,Newton=False):
+    """
+    Jacobi polynomials of type (a,b) up to degree n-1.
+    
+    Parameters
+    ----------
+    a,b > -1
+    z: float, np.ndarray.
+    
+    """
 
     if init == None:
         init = 1 + 0*z
@@ -39,6 +48,13 @@ def polynomials(n,a,b,z,init=None,normalised=True,dtype=dtype,Newton=False):
     return P[:n].astype(dtype)
 
 def quadrature(n,a,b,days=3,normalised=True,dtype=dtype):
+    """
+    Jacobi 'roots' grid and weights; solutions to
+    
+    P(n,a,b,z) = 0.
+
+
+    """
     
     z = grid_guess(n,a,b,dtype=dtype)
     
@@ -57,9 +73,23 @@ def quadrature(n,a,b,days=3,normalised=True,dtype=dtype):
     return z.astype(dtype), w.astype(dtype)
 
 def grid_guess(n,a,b,dtype=dtype):
+    """
+    Approximate solution to
+    
+    P(n,a,b,z) = 0
+    
+    """
     return np.cos(np.pi*(np.arange(4*n-1,2,-4,dtype=dtype)+2*a)/(4*n+2*(a+b+1)))
  
 def operator(name,normalised=True,dtype=dtype):
+    """
+    Interface to base JacobiOperator class.
+    
+    Parameters
+    ----------
+    name: A, B, C, D, Id, Pi, N, Z (Jacobi matrix)
+    
+    """
     if name == 'Id':
         return JacobiOperator.identity(dtype=dtype)
     if name == 'Pi':
@@ -73,7 +103,17 @@ def operator(name,normalised=True,dtype=dtype):
     return JacobiOperator(name,normalised=normalised,dtype=dtype)
    
 def measure(z,a,b,normalised=True,log=False):
-
+    """
+    
+    mu(a,b,z) = (1-z)**a (1+z)**b
+    
+    optionally:  ((1-z)/2)**a ((1+z)/2)**b / (2*Beta(a+1,b+1))
+    
+    Parameters
+    ----------
+    a,b > -1
+    
+    """
     if not log:
         w = (1-z)**a * (1+z)**b
         if normalised: w /= mass(a,b)
@@ -92,6 +132,16 @@ def measure(z,a,b,normalised=True,log=False):
     return S
 
 def mass(a,b,log=False):
+    """
+    
+    2**(a+b+1)*Beta(a+1,b+1) = integrate_(-1,+1)( (1-z)**a (1+z)**b )
+    
+    Parameters
+    __________
+    a,b > -1
+    log: optional
+    
+    """
 
     if not log:
         from scipy.special import beta
@@ -101,6 +151,22 @@ def mass(a,b,log=False):
     return (a+b+1)*np.log(2) + betaln(a+1,b+1)
 
 def norm_ratio(dn,da,db,n,a,b,squared=False):
+    """
+    Ratio of classical Jacobi normalisation.
+    
+        N(n,a,b) = integrate_(-1,+1)( (1-z)**a (1+z)**b P(n,a,b,z)**2 )
+    
+                                  Gamma(n+a+1) * Gamma(n+b+1)
+        N(n,a,b) = 2**(a+b+1) * ----------------------------------
+                                 (2n+a+b+1) * Gamma(n+a+b+1) * n!
+    
+    
+    The function returns: sqrt(N(n+dn,a+da,b+db)/N(n,a,b))
+    
+    This is used in rescaling the input and output of operators that increment n,a,b.
+    
+    
+    """
 
     if not all(type(d) == int for d in (dn,da,db)):
         raise TypeError('can only increment by integers.')
@@ -132,6 +198,50 @@ def norm_ratio(dn,da,db,n,a,b,squared=False):
         
 
 class JacobiOperator():
+    """
+    The base class for primary operators acting on finite row vectors of Jacobi polynomials.
+    
+    <n,a,b,z| = [P(0,a,b,z),P(1,a,b,z),...,P(n-1,a,b,z)]
+    
+    Each oparator takes the form:
+    
+    L(a,b,z,d/dz) <n,a,b,z| = <n+dn,a+da,b+db,z| R(n,a,b)
+    
+    The Left action is a z-differential operator.
+    The Right action is a matrix with n+dn rows and n columns.
+    
+    The Right action is encoded with an "infinite_csr" sparse matrix.
+    The parameter increments are encoded with a JacobiCodomain object.
+    
+     L(a,b,z,d/dz)  ...........................  dn, da, db
+    --------------------------------------------------------
+     A(+1) = 1      ..........................    0, +1,  0
+     A(-1) = 1-z    ..........................   +1, -1,  0
+     A(0)  = a      ..........................    0,  0,  0
+    
+     B(+1) = 1      ..........................    0,  0, +1
+     B(-1) = 1+z    ..........................   +1,  0, -1
+     B(0)  = b      ..........................    0,  0,  0
+    
+     C(+1) = b + (1+z)d/dz .....................  0, +1, -1
+     C(-1) = a - (1-z)d/dz .....................  0, -1, +1
+    
+     D(+1) = d/dz  .............................  -1, +1, +1
+     D(-1) = a(1+z) - b(1-z) - (1-z)(1+z)d/dz ..  +1, -1, -1
+     
+     Each -1 operator is the adjoint of the coresponding +1 operator.
+    
+     In addition there are a few exceptional operators:
+     
+        Identity: <n,a,b,z| -> <n,a,b,z|
+     
+        Parity:   <n,a,b,z| -> <n,a,b,-z| = <n,b,a,z| Pi
+                  The codomain is not additive in this case.
+     
+        Number:   <n,a,b,z| -> [0*P(0,a,b,z),1*P(1,a,b,z),...,(n-1)*P(n-1,a,b,z)]
+                  This operator doesn't have a local differential right action.
+        
+    """
     
     dtype='float128'
     
@@ -236,6 +346,24 @@ class JacobiOperator():
         return Operator(N,JacobiCodomain(0,0,0,0))
         
 class JacobiCodomain():
+    """
+    Base class for Jacobi codomain.
+    
+    codomain = JacobiCodomain(dn,da,db,pi)
+    
+    n', a', b' = codomain(n,a,b)
+    
+    if pi == 0:
+    
+        n', a', b' = n+dn, a+da, b+db
+    
+    if pi == 1:
+        
+        n', a', b' = n+dn, b+da, a+db
+        
+    pi_0 + pi_1 = pi_0 XOR pi_1
+    
+    """
     
     def __init__(self,dn,da,db,pi):
         self.__map = (dn,da,db,pi)
@@ -244,15 +372,15 @@ class JacobiCodomain():
         return self.__map[(item)]
     
     def __str__(self):
-        s = f"(n->n+{self[0]},a->a+{self[1]},b->b+{self[2]})".replace('+0','')
+        s = f"(n->n+{self[0]},a->a+{self[1]},b->b+{self[2]})"
         if self[3]: s = s.replace('a->a','a->b').replace('b->b','b->a')
-        return s
+        return s.replace('+0','').replace('+-','-')
         
     def __repr__(self):
         return str(self)
     
     def __add__(self,other):
-        return JacobiCodomain(*self(*other[:3],add=True),self[3]^other[3])
+        return JacobiCodomain(*self(*other[:3],evaluate=False),self[3]^other[3])
     
     def __mul__(self,other):
         if type(other) != int:
@@ -277,13 +405,12 @@ class JacobiCodomain():
     def __sub__(self,other):
         return self + (-other)
     
-    def __call__(self,*args,add=False):
+    def __call__(self,*args,evaluate=True):
         n,a,b = args[:3]
         if self[3]: a,b = b,a
         n, a, b = self[0] + n, self[1] + a, self[2] + b
-        if not add:
-            if a <= -1 or b <= -1:
-                raise ValueError('invalid Jacobi parameter.')
+        if evaluate and (a <= -1 or b <= -1):
+            raise ValueError('invalid Jacobi parameter.')
         return n,a,b
     
     def __eq__(self,other):
