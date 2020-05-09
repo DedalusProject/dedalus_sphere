@@ -1,16 +1,28 @@
 from scipy.sparse import csr_matrix
 from scipy.sparse import lil_matrix
+from scipy.sparse import identity
 
 class Operator():
     
     def __init__(self,function,codomain):
-    
+        
         self.__function = function
         self.__codomain = codomain
-    
+        
     @property
     def codomain(self):
         return self.__codomain
+        
+    def data(self,*args):
+        return self(*args).A
+    
+    @property
+    def T(self):
+        codomain = -self.codomain
+        def function(*args):
+            return self(*codomain(*args)).T
+        return Operator(function,codomain)
+    
     
     def __call__(self,*args):
         return self.__function(*args)
@@ -32,7 +44,7 @@ class Operator():
         def function(*args):
             return other*self(*args)
         return Operator(function,self.codomain)
-
+    
     def __rmul__(self,other):
             return self*other
     
@@ -53,7 +65,11 @@ class infinite_csr(csr_matrix):
 
     def __init__(self,*args,**kwargs):
         csr_matrix.__init__(self,*args,**kwargs)
-        
+    
+    @property
+    def T(self):
+        return infinite_csr(csr_matrix(self).T)
+    
     def __add__(self,other):
         
         ns, no = self.shape[0], other.shape[0]
