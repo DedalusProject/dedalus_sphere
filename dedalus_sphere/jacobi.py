@@ -3,35 +3,39 @@ from scipy.sparse import dia_matrix as banded
 
 from operators import infinite_csr, Operator
 
-dtype='float128'
+dtype='float64'
 
-def polynomials(n,a,b,z,init=None,normalised=True,dtype=dtype,Newton=False):
+def polynomials(n,a,b,z,Newton=False,init=None,normalised=True,dtype=dtype,internal='float128'):
     """
-    Jacobi polynomials of type (a,b) up to degree n-1.
+    Jacobi polynomials, P(n,a,b,z), of type (a,b) up to degree n-1.
     
-    Newton = True computes cubic-converging polish of P(n-1,a,b,z) = 0.
+    Newton = True: cubic-converging update of P(n-1,a,b,z) = 0.
     
     Parameters
     ----------
     a,b > -1
     z: float, np.ndarray.
     
+    init: float, np.ndarray or None -> 1+0*z, or (1+0*z)/sqrt(mass) if normalised.
+    normalised: classical or unit-integral normalisation.
+    dtype:   'float64','float128' output dtype.
+    internal: internal dtype.
+    
     """
-
+    
     if init == None:
         init = 1 + 0*z
         if normalised:
-            init /= np.sqrt(mass(a,b),dtype='float128')
+            init /= np.sqrt(mass(a,b),dtype=internal)
     
-    Z = operator('Z',normalised=normalised,dtype='float128')
+    Z = operator('Z',normalised=normalised,dtype=internal)
     Z = banded(Z(n+1,a,b).T).data
     
+    shape = n+1
     if type(z) == np.ndarray:
-        shape = (n+1,len(z))
-    else:
-        shape = n+1
+        shape = (shape,len(z))
     
-    P     = np.zeros(shape,dtype='float128')
+    P     = np.zeros(shape,dtype=internal)
     P[0]  = init
 
     if len(Z) == 2:
@@ -45,36 +49,47 @@ def polynomials(n,a,b,z,init=None,normalised=True,dtype=dtype,Newton=False):
     
     if Newton:
         L = n + (a+b)/2
-        return z + (1-z**2)*P[n-1]/(L*Z[-1,n]*P[n]-(L-1)*Z[0,n-2]*P[n-2]), P[:n-1].astype(dtype)
+        return z + (1-z**2)*P[n-1]/(L*Z[-1,n]*P[n]-(L-1)*Z[0,n-2]*P[n-2]), P[:n-1]
 
     return P[:n].astype(dtype)
 
-def quadrature(n,a,b,days=3,normalised=True,dtype=dtype):
+def quadrature(n,a,b,days=3,probability=False,dtype=dtype,internal='float128'):
     """
     Jacobi 'roots' grid and weights; solutions to
     
-    P(n,a,b,z) = 0.
-
-
+    P(n,a,b,z) = 0; len(z) = n.
+    
+    sum(weights*polynomial) = integrate_(-1,+1)(polynomial),
+    exactly up to degree(polynomial) = 2n - 1.
+    
+    Parameters
+    ----------
+    n: int > 0.
+    a,b: float > -1.
+    days: number of Newton updates.
+    probability: sum(weights) = 1 or sum(weights) = mass(a,b)
+    dtype:   'float64','float128' output dtype.
+    internal: internal dtype (Newton uses by default).
+    
     """
     
-    z = grid_guess(n,a,b,dtype=dtype)
+    z = grid_guess(n,a,b,dtype=internal)
     
     if (a == b == -1/2) or (a == b == +1/2):
-        P = polynomials(n+1,a,b,z,normalised=normalised)[:n]
+        P = polynomials(n+1,a,b,z,dtype=internal)[:n]
     else:
         for _ in range(days):
-            z, P = polynomials(n+1,a,b,z,Newton=True,normalised=normalised)
+            z, P = polynomials(n+1,a,b,z,Newton=True)
         
     P[0] /= np.sqrt(np.sum(P**2,axis=0))
     w = P[0]**2
     
-    if not normalised:
+    if not probability:
         w *= mass(a,b)
     
     return z.astype(dtype), w.astype(dtype)
 
-def grid_guess(n,a,b,dtype=dtype):
+def grid_guess(n,a,b,dtype='float128'):
     """
     Approximate solution to
     
@@ -167,6 +182,12 @@ def norm_ratio(dn,da,db,n,a,b,squared=False):
     
     This is used in rescaling the input and output of operators that increment n,a,b.
     
+    Parameters
+    ----------
+    dn,da,db: int
+    n: np.ndarray, int > 0
+    a,b: float > -1
+    squared: return N(n,a,b) or sqrt(N(n,a,b)) (defalut)
     
     """
 
@@ -205,6 +226,8 @@ class JacobiOperator():
     
     <n,a,b,z| = [P(0,a,b,z),P(1,a,b,z),...,P(n-1,a,b,z)]
     
+    P(k,a,b,z) = <n,a,b,z|k> if k < n else 0.
+    
     Each oparator takes the form:
     
     L(a,b,z,d/dz) <n,a,b,z| = <n+dn,a+da,b+db,z| R(n,a,b)
@@ -212,7 +235,7 @@ class JacobiOperator():
     The Left action is a z-differential operator.
     The Right action is a matrix with n+dn rows and n columns.
     
-    The Right action is encoded with an "infinite_csr" sparse matrix.
+    The Right action is encoded with an "infinite_csr" sparse matrix object.
     The parameter increments are encoded with a JacobiCodomain object.
     
      L(a,b,z,d/dz)  ............................  dn, da, db
@@ -242,7 +265,30 @@ class JacobiOperator():
      
         Number:   <n,a,b,z| -> [0*P(0,a,b,z),1*P(1,a,b,z),...,(n-1)*P(n-1,a,b,z)]
                   This operator doesn't have a local differential Left action.
-        
+    
+    Attributes
+    ----------
+    name: str
+        A, B, C, D
+    normalised: bool
+        True gives operators on unit-integral polynomials, False on classical normalisation.
+    dtype: 'float64','float128'
+        output dtype.
+    
+    
+    Methods
+    -------
+    __call__(p): p=-1,0,1
+        returns Operator object depending on p.
+        Operator.function is an infinite_csr matrix constructor for n,a,b.
+        Operator.codomain is a JacobiCodomain object.
+    
+    staticmethods
+    -------------
+    identity: Operator object for identity matrix
+    parity:   Operator object for reflection transformation.
+    number:   Operator object for polynomial degree.
+    
     """
     
     dtype='float128'
@@ -251,7 +297,7 @@ class JacobiOperator():
         
         self.__normalised = normalised
         self.__function   = getattr(self,f'_JacobiOperator__{name}')
-                                                  
+        self.dtype        = dtype
     
     @property
     def normalised(self):
@@ -263,15 +309,14 @@ class JacobiOperator():
     def __A(self,p):
         
         if p == 0:
-            @format
             def A(n,a,b):
-                N = a*np.ones(n,dtype=dtype)
-                return banded((N,[0]),(n,n))
+                N = a*np.ones(n,dtype=self.__dtype)
+                return infinite_csr(banded((N,[0]),(n,n)))
             return A, JacobiCodomain(0,0,0,0)
         
         def A(n,a,b):
         
-            N = np.arange(n,dtype=self.dtype)
+            N = np.arange(n,dtype=self.__dtype)
             bands = np.array({+1:[N+(a+b+1),  -(N+b)],
                               -1:[2*(N+a)  ,-2*(N+1)]}[p])
             bands[:,0] = 1 if a+b == -1 else bands[:,0]/(a+b+1)
@@ -297,7 +342,7 @@ class JacobiOperator():
         
         def C(n,a,b):
                 
-            N = np.arange(n,dtype=self.dtype)
+            N = np.arange(n,dtype=self.__dtype)
             bands = np.array([N + {+1:b,-1:a}[p]])
             
             if self.normalised:
@@ -311,7 +356,7 @@ class JacobiOperator():
         
         def D(n,a,b):
         
-            N = np.arange(n,dtype=self.dtype)
+            N = np.arange(n,dtype=self.__dtype)
             bands = np.array([(N + {+1:a+b+1,-1:1}[p])*2**(-p)])
             
             if self.normalised:
@@ -356,22 +401,36 @@ class JacobiCodomain():
     n', a', b' = codomain(n,a,b)
     
     if pi == 0:
-    
         n', a', b' = n+dn, a+da, b+db
     
     if pi == 1:
-        
         n', a', b' = n+dn, b+da, a+db
         
     pi_0 + pi_1 = pi_0 XOR pi_1
     
+    Attributes
+    ----------
+    __arrow: stores dn,da,db,pi.
+    
+    
+    Methods
+    -------
+    self[0:3]: returns dn,da,db,pi respectively.
+    str(self): displays codomain mapping.
+    self + other: combines codomains.
+    self(n,a,b): evaluates current codomain.
+    -self: inverse codomain.
+    n*self: iterated codomain addition.
+    self == other: determines equivalent codomains (a,b,pi).
+    self | other: determines codomain compatiblity and returns larger-n space.
+    
     """
     
     def __init__(self,dn,da,db,pi):
-        self.__map = (dn,da,db,pi)
+        self.__arrow = (dn,da,db,pi)
     
     def __getitem__(self,item):
-        return self.__map[(item)]
+        return self.__arrow[(item)]
     
     def __str__(self):
         s = f'(n->n+{self[0]},a->a+{self[1]},b->b+{self[2]})'
