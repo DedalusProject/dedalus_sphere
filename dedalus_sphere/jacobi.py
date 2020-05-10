@@ -105,6 +105,8 @@ def operator(name,normalised=True,dtype=dtype):
     Parameters
     ----------
     name: A, B, C, D, Id, Pi, N, Z (Jacobi matrix)
+    normalised: True --> unit-integral, False --> classical.
+    dtype: output dtype
     
     """
     if name == 'Id':
