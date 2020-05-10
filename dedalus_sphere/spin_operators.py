@@ -1,5 +1,8 @@
-from intertwiner import *
+import numpy as np
+from itertools import product
 from itertools import permutations
+
+from operators import Operator
 
 # Helper functions
 dual   = lambda t: tuple(-e for e in t)
@@ -7,200 +10,149 @@ apply  = lambda p: lambda t: tuple(t[i] for i in p)
 sum_   = lambda k: lambda t: sum(t[i] for i in k if 0 <= i < len(t))
 remove = lambda k: lambda t: tuple(s for i,s in enumerate(t) if not i in k)
 
-def log_(d,n,add=0):
-    while n>1:
-        n //= d
-        add += 1
-    return add
+def int2tuple(func):
+    return lambda *args: int(func(*[(s,) if type(s)==int else s for s in args]))
 
-def array_check(func):
-    def wrapper(self,other):
-        if type(other) == np.ndarray:
-            n    = other.shape[0]
-            rank = log_(self.dimension,n)
-            if n != self.dimension**rank:
-                raise TypeError('incompatible domain.')
-            return eval(f"np.ndarray.{func.__name__}(self(rank),other)")
-        return func(self,other)
-        wrapper.__name__ = func.__name__
-    return wrapper
+def indices(rank,indexing):
+    return product(*(rank*(indexing,)))
+
+def tuple_array(elements,ranks,indexing):
     
-class SpinOperator(object):
-    
-    def __init__(self,func,arrow,spins=(-1,0,1)):
+    T = np.zeros(tuple(len(indexing)**r for r in ranks))
+    for i, sigma in enumerate(indices(ranks[0],indexing)):
+        for j, tau in enumerate(indices(ranks[1],indexing)):
+            T[i,j] = elements[sigma,tau]
+    return T
+
+class SpinCodomain():
+
+    def __init__(self,rank_change):
+        self.__arrow = rank_change
         
-        good = False
-        for s in [(-1,1),(-1,0,1)]:
-            good = good or spins in list(permutations(s))
-        if not good: raise TypeError('invalid spins.')
+    @property
+    def arrow(self):
+        return self.__arrow
+    
+    def __str__(self):
+        s = f'(rank->rank+{self.arrow})'
+        return s.replace('+0','').replace('+-','-')
+    
+    def __repr__(self):
+        return str(self)
         
-        self.__func  = func
-        self.__arrow = arrow
-        self.__spins = spins
-    
-    def __getitem__(self,item):
-        return self.__func(item[0],item[1])
-    
-    @property
-    def arrow(self): return self.__arrow
-    
-    @property
-    def spins(self): return self.__spins
-    
-    @property
-    def dimension(self): return len(self.spins)
-    
-    def codomain(self,rank):
-        return self.arrow + rank
-    
-    def ranks(self,rank):
-        return (self.codomain(rank),rank)
-    
-    def shape(self,rank):
-        return tuple(self.dimension**r for r in self.ranks(rank))
-    
-    def __call__(self,rank):
-        r_out, r_in = self.ranks(rank)
-        M = np.zeros(self.shape(rank))
-        for i, sigma in enumerate(indices(r_out,indexing=self.spins)):
-            for j, tau in enumerate(indices(r_in,indexing=self.spins)):
-                M[i,j] = self[sigma,tau]
-        return M
-    
-    @property
-    def T(self):
-        def func(sigma,tau):
-            return self[tau,sigma]
-        return SpinOperator(func,-self.arrow,self.spins)
-    
-    @array_check
-    def __matmul__(self,other):
-        def func(sigma,tau):
-            K = indices(other.codomain(len(tau)),indexing=self.spins)
-            
-            return sum(self[sigma,kappa]*other[kappa,tau] for kappa in K)
-        return SpinOperator(func,self.arrow+other.arrow,self.spins)
-    
-    @array_check
     def __add__(self,other):
-        if self.arrow != other.arrow:
-            raise TypeError('incompatible codomains')
-        def func(sigma,tau):
-            return self[sigma,tau] + other[sigma,tau]
-        return SpinOperator(func,self.arrow,self.spins)
+        return SpinCodomain(self.arrow+other.arrow)
     
-    @array_check
+    def __call__(self,other):
+        if self.arrow + other < 0:
+            raise ValueError('cannot map to negative rank.')
+        return (self.arrow + other,)
+        
+    def __eq__(self,other):
+        return self.arrow == other.arrow
+        
+    def __or__(self,other):
+        if self != other:
+            raise TypeError('operators have incompatible codomains.')
+        return self
+        
+    def __neg__(self):
+        return (-1)*self
+        
     def __mul__(self,other):
-        def func(sigma,tau):
-            return other*self[sigma,tau]
-        return SpinOperator(func,self.arrow,self.spins)
+        if type(other) != int:
+            raise TypeError('only integer multiplication defined.')
+        return SpinCodomain(other*self.arrow)
     
     def __rmul__(self,other):
         return self*other
     
-    def __truediv__(self,other):
-        return self*(1/other)
-        
-    def __neg__(self):
-        return (-1)*self
-    
-    def __pos__(self):
-        return self
-    
     def __sub__(self,other):
         return self + (-other)
-    
-    # right operations with np.ndarray
-    def __array_ufunc__(self, *args):
-        if args[0] == np.matmul:
-            return (args[3].T @ args[2].T).T
-        if args[0] == np.multiply:
-            return args[3]*args[2]
-        if args[0] == np.add:
-            return args[3]+args[2]
-        if args[0] == np.subtract:
-            return -args[3]+args[2]
-        pass
 
-class Identity(SpinOperator):
-    
-    def __init__(self,**kwargs):
-        SpinOperator.__init__(self,self.__identity,0,**kwargs)
-    
-    def __identity(self,sigma,tau):
-        if sigma == tau:
-            return 1
-        return 0
-    
 
-class Metric(SpinOperator):
+class Identity(Operator):
     
-    def __init__(self,**kwargs):
-        SpinOperator.__init__(self,self.__metric,0,**kwargs)
-    
-    def __metric(self,sigma,tau):
-        if sigma == dual(tau):
-            return 1
-        return 0
-    
-    
-class Transpose(SpinOperator):
-    
-    def __init__(self,permutation=(1,0),**kwargs):
-        SpinOperator.__init__(self,self.__transpose,0,**kwargs)
+    def __init__(self,indexing=(-1,0,+1)):
         
+        def identity(rank):
+            return tuple_array(self,(rank,rank),indexing)
+        
+        Operator.__init__(self,identity,SpinCodomain(0))
+        
+    @int2tuple
+    def __getitem__(self,i):
+        return i[0] == i[1]
+
+
+class Metric(Operator):
+    
+    def __init__(self,indexing=(-1,0,+1)):
+    
+        def metric(rank):
+            return tuple_array(self,(rank,rank),indexing)
+        
+        Operator.__init__(self,metric,SpinCodomain(0))
+    
+    @int2tuple
+    def __getitem__(self,i):
+        return i[0] == dual(i[1])
+    
+    
+class Transpose(Operator):
+    
+    def __init__(self,permutation=(1,0),indexing=(-1,0,+1)):
+    
+        def transpose(rank):
+            return tuple_array(self,(rank,rank),indexing)
+        
+        Operator.__init__(self,transpose,SpinCodomain(0))
         self.__permutation = permutation
-        
+    
     @property
-    def permutation(self): return self.__permutation
+    def permutation(self):
+        return self.__permutation
     
-    def __transpose(self,sigma,tau):
-        if sigma == apply(self.permutation)(tau):
-            return 1
-        return 0
-    
-    
-class Trace(SpinOperator):
-    
-    def __init__(self,indices=(0,1),**kwargs):
-        SpinOperator.__init__(self,self.__trace,-len(indices),**kwargs)
-    
-        self.__indices = indices
-        
-    @property
-    def indices(self): return self.__indices
-    
-    def __trace(self,sigma,tau):
-        if sigma == remove(self.indices)(tau) and sum_(self.indices)(tau) == 0:
-            return 1
-        return 0
-        
+    @int2tuple
+    def __getitem__(self,i):
+        return i[0] == apply(self.permutation)(i[1])
 
-class Rotation(SpinOperator):
+class Trace(Operator):
     
-    def __init__(self,index=0,**kwargs):
-        SpinOperator.__init__(self,self.__rotation,1,**kwargs)
+    def __init__(self,indices=(0,1),indexing=(-1,0,+1)):
+    
+        def trace(rank):
+            return tuple_array(self,(rank-len(self.indices),rank),indexing)
         
-        self.__index = index
+        Operator.__init__(self,trace,SpinCodomain(-len(indices)))
         
+        self.__indices  = indices
+    
     @property
-    def index(self): return self.__index
-
-    def __rotation(self,sigma,tau):
-            return NotImplimented
+    def indices(self):
+        return self.__indices
     
-class TensorProduct(SpinOperator):
+    @int2tuple
+    def __getitem__(self,i):
+        return i[0] == remove(self.indices)(i[1]) and sum_(self.indices)(i[1]) == 0
     
-    def __init__(self,element,**kwargs):
+class TensorProduct(Operator):
+    
+    def __init__(self,element,indexing=(-1,0,1)):
         if type(element) == int: element = (element,)
-        SpinOperator.__init__(self,self.__product,len(element),**kwargs)
         
+        def product(rank):
+            return tuple_array(self,(rank+len(self.element),rank),indexing)
+        
+        Operator.__init__(self,product,SpinCodomain(len(element)))
         self.__element = element
-        
+    
     @property
-    def element(self): return self.__element
+    def element(self):
+        return self.__element
 
-    def __product(self,sigma,tau):
-        if sigma == self.element + tau:
-            return 1
-        return 0
+    @int2tuple
+    def __getitem__(self,i):
+        return i[0] == self.element + i[1]
+    
+
