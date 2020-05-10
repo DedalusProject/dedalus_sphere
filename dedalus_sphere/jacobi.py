@@ -9,6 +9,8 @@ def polynomials(n,a,b,z,Newton=False,init=None,normalised=True,dtype=dtype,inter
     """
     Jacobi polynomials, P(n,a,b,z), of type (a,b) up to degree n-1.
     
+    Jacobi.polynomials(n,a,b,z)[k] gives P(k,a,b,z).
+    
     Newton = True: cubic-converging update of P(n-1,a,b,z) = 0.
     
     Parameters
@@ -312,13 +314,13 @@ class JacobiOperator():
         
         if p == 0:
             def A(n,a,b):
-                N = a*np.ones(n,dtype=self.__dtype)
+                N = a*np.ones(n,dtype=self.dtype)
                 return infinite_csr(banded((N,[0]),(n,n)))
             return A, JacobiCodomain(0,0,0,0)
         
         def A(n,a,b):
         
-            N = np.arange(n,dtype=self.__dtype)
+            N = np.arange(n,dtype=self.dtype)
             bands = np.array({+1:[N+(a+b+1),  -(N+b)],
                               -1:[2*(N+a)  ,-2*(N+1)]}[p])
             bands[:,0] = 1 if a+b == -1 else bands[:,0]/(a+b+1)
@@ -328,7 +330,7 @@ class JacobiOperator():
                 bands[0] *= norm_ratio(0,p,0,N,a,b)
                 bands[1,(1+p)//2:] *= norm_ratio(-p,p,0,N[(1+p)//2:],a,b)
                 
-            return infinite_csr(banded((bands,[0,p]),(n+(1-p)//2,n)))
+            return infinite_csr(banded((bands,[0,p]),(max(n+(1-p)//2,0),max(n,0))))
         
         return A, JacobiCodomain((1-p)//2,p,0,0)
 
@@ -344,13 +346,13 @@ class JacobiOperator():
         
         def C(n,a,b):
                 
-            N = np.arange(n,dtype=self.__dtype)
+            N = np.arange(n,dtype=self.dtype)
             bands = np.array([N + {+1:b,-1:a}[p]])
             
             if self.normalised:
                 bands[0] *= norm_ratio(0,p,-p,N,a,b)
                 
-            return infinite_csr(banded((bands,[0]),(n,n)))
+            return infinite_csr(banded((bands,[0]),(max(n,0),max(n,0))))
         
         return C, JacobiCodomain(0,p,-p,0)
 
@@ -358,13 +360,13 @@ class JacobiOperator():
         
         def D(n,a,b):
         
-            N = np.arange(n,dtype=self.__dtype)
+            N = np.arange(n,dtype=self.dtype)
             bands = np.array([(N + {+1:a+b+1,-1:1}[p])*2**(-p)])
             
             if self.normalised:
                 bands[0,(1+p)//2:] *= norm_ratio(-p,p,p,N[(1+p)//2:],a,b)
             
-            return infinite_csr(banded((bands,[p]),(max(n-p,0),n)))
+            return infinite_csr(banded((bands,[p]),(max(n-p,0),max(n,0))))
         
         return D, JacobiCodomain(-p,p,p,0)
     
@@ -373,7 +375,7 @@ class JacobiOperator():
         
         def I(n,a,b):
             N = np.ones(n,dtype=dtype)
-            return infinite_csr(banded((N,[0]),(n,n)))
+            return infinite_csr(banded((N,[0]),(max(n,0),max(n,0))))
             
         return Operator(I,JacobiCodomain(0,0,0,0))
     
@@ -382,7 +384,7 @@ class JacobiOperator():
         
         def P(n,a,b):
             N = np.arange(n,dtype=dtype)
-            return infinite_csr(banded(((-1)**N,[0]),(n,n)))
+            return infinite_csr(banded(((-1)**N,[0]),(max(n,0),max(n,0))))
         
         return Operator(P,JacobiCodomain(0,0,0,1))
         
@@ -390,7 +392,7 @@ class JacobiOperator():
     def number(dtype=dtype):
         
         def N(n,a,b):
-            return infinite_csr(banded((np.arange(n,dtype=dtype),[0]),(n,n)))
+            return infinite_csr(banded((np.arange(n,dtype=dtype),[0]),(max(n,0),max(n,0))))
         
         return Operator(N,JacobiCodomain(0,0,0,0))
         
