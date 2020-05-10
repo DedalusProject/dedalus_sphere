@@ -6,11 +6,12 @@ from operators import Operator
 
 indexing = (-1,0,1)
 
-# Helper functions
-dual   = lambda t: tuple(-e for e in t)
-apply  = lambda p: lambda t: tuple(t[i] for i in p)
-sum_   = lambda k: lambda t: sum(t[i] for i in k if 0 <= i < len(t))
-remove = lambda k: lambda t: tuple(s for i,s in enumerate(t) if not i in k)
+# tuple helper functions
+dual    =             lambda t: tuple(-e for e in t)
+apply   = lambda p:   lambda t: tuple(t[i] for i in p)
+sum_    = lambda k:   lambda t: sum(t[i] for i in k if 0 <= i < len(t))
+remove  = lambda k:   lambda t: tuple(s for i,s in enumerate(t) if not i in k)
+replace = lambda j,n: lambda t: tuple(s if i!=j else n for i,s in enumerate(t))
 
 def int2tuple(func):
     return lambda *args: int(func(*[(s,) if type(s)==int else s for s in args]))
@@ -19,7 +20,6 @@ def indices(rank,indexing):
     return product(*(rank*(indexing,)))
 
 def tuple_array(elements,ranks,indexing):
-    
     T = np.zeros(tuple(len(indexing)**r for r in ranks))
     for i, sigma in enumerate(indices(ranks[0],indexing)):
         for j, tau in enumerate(indices(ranks[1],indexing)):
