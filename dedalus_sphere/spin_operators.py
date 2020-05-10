@@ -4,6 +4,8 @@ from itertools import permutations
 
 from operators import Operator
 
+indexing = (-1,0,1)
+
 # Helper functions
 dual   = lambda t: tuple(-e for e in t)
 apply  = lambda p: lambda t: tuple(t[i] for i in p)
@@ -73,7 +75,7 @@ class SpinCodomain():
 
 class Identity(Operator):
     
-    def __init__(self,indexing=(-1,0,+1)):
+    def __init__(self,indexing=indexing):
         
         def identity(rank):
             return tuple_array(self,(rank,rank),indexing)
@@ -87,7 +89,7 @@ class Identity(Operator):
 
 class Metric(Operator):
     
-    def __init__(self,indexing=(-1,0,+1)):
+    def __init__(self,indexing=indexing):
     
         def metric(rank):
             return tuple_array(self,(rank,rank),indexing)
@@ -101,7 +103,7 @@ class Metric(Operator):
     
 class Transpose(Operator):
     
-    def __init__(self,permutation=(1,0),indexing=(-1,0,+1)):
+    def __init__(self,permutation=(1,0),indexing=indexing):
     
         def transpose(rank):
             return tuple_array(self,(rank,rank),indexing)
@@ -119,10 +121,10 @@ class Transpose(Operator):
 
 class Trace(Operator):
     
-    def __init__(self,indices=(0,1),indexing=(-1,0,+1)):
+    def __init__(self,indices=(0,1),indexing=indexing):
     
         def trace(rank):
-            return tuple_array(self,(rank-len(self.indices),rank),indexing)
+            return tuple_array(self,(rank-len(indices),rank),indexing)
         
         Operator.__init__(self,trace,SpinCodomain(-len(indices)))
         
@@ -142,7 +144,7 @@ class TensorProduct(Operator):
         if type(element) == int: element = (element,)
         
         def product(rank):
-            return tuple_array(self,(rank+len(self.element),rank),indexing)
+            return tuple_array(self,(rank+len(element),rank),indexing)
         
         Operator.__init__(self,product,SpinCodomain(len(element)))
         self.__element = element
