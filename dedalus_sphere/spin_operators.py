@@ -6,6 +6,30 @@ from operators import Operator
 indexing = (-1,0,1)
 
 class TensorOperator(Operator):
+    """
+    Class for lazy evaluation of spin/regularity tensor operations.
+    
+    Attributes
+    ----------
+    codomain: TensorCodomain object
+        keeps track of the difference in rank of TensorOperators.
+    indexing: tuple
+        must be a permutation of (-1,+1) or (-1,0,+1)
+    dimension: int
+        number of basis indices.
+    
+    Methods
+    -------
+    self(rank):
+        all TensorOperator objects are callable on the input rank of a tensor.
+    self[sigma,tau]:
+        sigma,tau tuples of spin/regularity indices
+    self.generator(rank):
+        generate all lenght-rank tuples according to a given indexing.
+    self.array:
+        from self[sigma,tau] compute flattened (dimension**ranks[0],dimension**ranks[1]) np.ndarray.
+    
+    """
 
     def __init__(self,function,codomain,indexing=indexing):
         Operator.__init__(self,function,codomain,Output=TensorOperator)
@@ -37,6 +61,14 @@ class TensorOperator(Operator):
         return T
 
 class Identity(TensorOperator):
+    """
+    Spin/regularity space identity transformation of arbitrary rank.
+    
+    Methods
+    -------
+    self[sigma,tau] = 1 if sigma == tau else 0
+    
+    """
     
     def __init__(self,indexing=indexing):
         
@@ -49,6 +81,16 @@ class Identity(TensorOperator):
 
 
 class Metric(TensorOperator):
+    """
+    Spin-space representation of arbitrary-rank local Cartesian metric tensor. E.g.:
+    
+    Id = e(+)e(-) + e(0)e(0) + e(-)e(+) = e(x)e(x) + e(y)e(y) + e(z)e(z)
+    
+    Methods
+    -------
+    self[sigma,tau] = 1 if sigma == -tau else 0
+    
+    """
     
     def __init__(self,indexing=indexing):
     
@@ -61,6 +103,24 @@ class Metric(TensorOperator):
     
     
 class Transpose(TensorOperator):
+    """
+    Transpose operator for arbitrary rank tensor.
+    
+        T[i,j,...,k] -> T[permutation(i,j,...,k)]
+    
+    Default transposes 0 <--> 1 indices.
+    
+    Attributes
+    ----------
+    permutation: tuple
+        Relative to natural order, using Cauchy's "one-line notation".
+    
+    Methods
+    -------
+    self[sigma,tau] = self[sigma,permutation(tau)]
+    
+    
+    """
     
     def __init__(self,permutation=(1,0),indexing=indexing):
     
@@ -77,6 +137,10 @@ class Transpose(TensorOperator):
         return int(i[0] == apply(self.permutation)(i[1]))
 
 class Trace(TensorOperator):
+    """
+    Contract over arbitrary indices.
+    
+    """
     
     def __init__(self,indices=(0,1),indexing=indexing):
     
@@ -94,6 +158,10 @@ class Trace(TensorOperator):
         return int(i[0] == remove(self.indices)(i[1]) and sum_(self.indices)(i[1]) == 0)
     
 class TensorProduct(TensorOperator):
+    """
+    Action of multiplication by single spin-tensor basis element
+    
+    """
     
     def __init__(self,element,indexing=indexing):
         if type(element) == int: element = (element,)
@@ -129,6 +197,12 @@ def xi(mu,ell):
 
 
 class Intertwiner(TensorOperator):
+    """
+    Regularity-to-spin map.
+    
+        Q(ell)[spin,regularity]
+    
+    """
 
     def __init__(self,L,indexing=indexing):
         
@@ -186,6 +260,17 @@ class Intertwiner(TensorOperator):
     
 
 class TensorCodomain():
+    """
+    Class for keeping track of TensorOperator codomains.
+    
+    
+    Attributes
+    ----------
+    arrow: int
+    relative chnage in rank between input and output.
+    
+    
+    """
 
     def __init__(self,rank_change):
         self.__arrow = rank_change
