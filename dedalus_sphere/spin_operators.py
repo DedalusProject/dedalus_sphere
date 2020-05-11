@@ -1,33 +1,9 @@
 import numpy as np
 from itertools import product
+from tuple_tools import *
 from operators import Operator
 
 indexing = (-1,0,1)
-
-# tuple helper functions
-dual    =             lambda t: tuple(-e for e in t)
-apply   = lambda p:   lambda t: tuple(t[int(i)] for i in p)
-sum_    = lambda k:   lambda t: sum(t[int(i)] for i in k if 0 <= i < len(t))
-remove  = lambda k:   lambda t: tuple(s for i,s in enumerate(t) if not i in k)
-replace = lambda j,n: lambda t: tuple(s if i!=j else n for i,s in enumerate(t))
-
-def int2tuple(func):
-    if func.__name__ == '__getitem__':
-        def wrapper(*args):
-            self, args = args[0], args[1]
-            if type(args) == int: return func(self,(args,))
-            args = (self,tuple((s,) if type(s)==int else s for s in args))
-            return func(*args)
-        return wrapper
-    return lambda *args: func(*tuple((s,) if type(s)==int else s for s in args))
-        
-def tuple2index(tup,indexing):
-    return int('0'+''.join(str(indexing.index(s)) for s in tup),len(indexing))
-
-def index2tuple(index,rank,indexing):
-    s = np.base_repr(index,len(indexing),rank)
-    return apply(s[(rank==0)-rank:])(indexing)
-
 
 class TensorOperator(Operator):
 
@@ -50,13 +26,13 @@ class TensorOperator(Operator):
         j = tuple2index(tau,self.indexing)
         return self(len(tau))[i,j]
     
-    def indices(self,rank):
+    def generator(self,rank):
         return product(*(rank*(self.indexing,)))
     
     def array(self,ranks):
         T = np.zeros(tuple(self.dimension**r for r in ranks))
-        for i, sigma in enumerate(self.indices(ranks[0])):
-            for j, tau in enumerate(self.indices(ranks[1])):
+        for i, sigma in enumerate(self.generator(ranks[0])):
+            for j, tau in enumerate(self.generator(ranks[1])):
                 T[i,j] = self[sigma,tau]
         return T
 
@@ -195,8 +171,8 @@ class Intertwiner(TensorOperator):
         
         R = 0
         for i,t in enumerate(tau):
-            if t == -sigma: R -= self[replace(i,0)(tau),b]
-            if t ==  0    : R += self[replace(i,sigma)(tau),b]
+            if t+sigma ==  0: R -= self[replace(i,0)(tau),b]
+            if t       ==  0: R += self[replace(i,sigma)(tau),b]
 
         Q  = self[tau,b]
         R -= self.k(sigma,sum(tau))*Q
