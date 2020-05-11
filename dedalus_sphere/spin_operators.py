@@ -12,17 +12,22 @@ remove  = lambda k:   lambda t: tuple(s for i,s in enumerate(t) if not i in k)
 replace = lambda j,n: lambda t: tuple(s if i!=j else n for i,s in enumerate(t))
 
 def int2tuple(func):
-    return lambda *args: int(func(*[(s,) if type(s)==int else s for s in args]))
+    if func.__name__ == '__getitem__':
+        def wrapper(*args):
+            self, args = args[0], args[1]
+            if type(args) == int: return func(self,(args,))
+            args = (self,tuple((s,) if type(s)==int else s for s in args))
+            return func(*args)
+        return wrapper
+    return lambda *args: func(*tuple((s,) if type(s)==int else s for s in args))
+        
+def tuple2index(tup,indexing):
+    return int('0'+''.join(str(indexing.index(s)) for s in tup),len(indexing))
 
 def index2tuple(index,rank,indexing):
     s = np.base_repr(index,len(indexing),rank)
     return apply(s[(rank==0)-rank:])(indexing)
-    
-def tuple2index(tup,indexing):
-    return int('0'+''.join(str(indexing.index(s)) for s in tup),len(indexing))
 
-def indices(rank,indexing):
-    return product(*(rank*(indexing,)))
 
 class TensorOperator(Operator):
 
@@ -38,16 +43,20 @@ class TensorOperator(Operator):
     def dimension(self):
         return len(self.indexing)
     
+    @int2tuple
     def __getitem__(self,i):
         sigma,tau = i[0],i[1]
         i = tuple2index(sigma,self.indexing)
         j = tuple2index(tau,self.indexing)
         return self(len(tau))[i,j]
-
+    
+    def indices(self,rank):
+        return product(*(rank*(self.indexing,)))
+    
     def array(self,ranks):
         T = np.zeros(tuple(self.dimension**r for r in ranks))
-        for i, sigma in enumerate(indices(ranks[0],self.indexing)):
-            for j, tau in enumerate(indices(ranks[1],self.indexing)):
+        for i, sigma in enumerate(self.indices(ranks[0])):
+            for j, tau in enumerate(self.indices(ranks[1])):
                 T[i,j] = self[sigma,tau]
         return T
 
@@ -60,7 +69,7 @@ class Identity(TensorOperator):
         
     @int2tuple
     def __getitem__(self,i):
-        return i[0] == i[1]
+        return int(i[0] == i[1])
 
 
 class Metric(TensorOperator):
@@ -72,7 +81,7 @@ class Metric(TensorOperator):
     
     @int2tuple
     def __getitem__(self,i):
-        return i[0] == dual(i[1])
+        return int(i[0] == dual(i[1]))
     
     
 class Transpose(TensorOperator):
@@ -89,7 +98,7 @@ class Transpose(TensorOperator):
     
     @int2tuple
     def __getitem__(self,i):
-        return i[0] == apply(self.permutation)(i[1])
+        return int(i[0] == apply(self.permutation)(i[1]))
 
 class Trace(TensorOperator):
     
@@ -106,7 +115,7 @@ class Trace(TensorOperator):
     
     @int2tuple
     def __getitem__(self,i):
-        return i[0] == remove(self.indices)(i[1]) and sum_(self.indices)(i[1]) == 0
+        return int(i[0] == remove(self.indices)(i[1]) and sum_(self.indices)(i[1]) == 0)
     
 class TensorProduct(TensorOperator):
     
@@ -123,7 +132,81 @@ class TensorProduct(TensorOperator):
 
     @int2tuple
     def __getitem__(self,i):
-        return i[0] == self.element + i[1]
+        return int(i[0] == self.element + i[1])
+        
+
+
+def xi(mu,ell):
+    """
+        Normalised derivative scale factors. xi(-1,ell)**2 + xi(+1,ell)**2 = 1.
+        
+        Parameters
+        ----------
+        mu  : int
+            regularity; -1,+1,0. xi(0,ell) = 0 by definition.
+        ell : int
+            spherical-harmonic degree.
+        
+        """
+
+    return np.abs(mu)*np.sqrt((1 + mu/(2*ell+1))/2)
+
+
+class Intertwiner(TensorOperator):
+
+    def __init__(self,L,indexing=indexing):
+        
+        intertwiner = lambda rank: self.array((rank,rank))
+        TensorOperator.__init__(self,intertwiner,TensorCodomain(0),indexing=indexing)
+        self.__ell = L
+
+    @property
+    def L(self):
+        return self.__ell
+        
+    def k(self,s,mu):
+        return -s*np.sqrt((self.L-s*mu)*(self.L+s*mu+1)/2)
+    
+    @int2tuple
+    def forbidden_spin(self,spin):
+        return self.L < abs(sum(spin))
+    
+    @int2tuple
+    def forbidden_regularity(self,regularity):
+        walk = (self.L,)
+        for r in regularity[::-1]:
+            walk += (walk[-1] + r,)
+            if walk[-1] < 0 or walk[-2:] == (0,0):
+                return True
+        return False
+    
+    @int2tuple
+    def __getitem__(self,i):
+    
+        spin, regularity = i[0], i[1]
+        
+        if spin == (): return 1
+
+        if self.forbidden_spin(spin) or self.forbidden_regularity(regularity):
+            return 0
+        
+        sigma, a = spin[0],  regularity[0]
+        tau,   b = spin[1:], regularity[1:]
+        
+        R = 0
+        for i,t in enumerate(tau):
+            if t == -sigma: R -= self[replace(i,0)(tau),b]
+            if t ==  0    : R += self[replace(i,sigma)(tau),b]
+
+        Q  = self[tau,b]
+        R -= self.k(sigma,sum(tau))*Q
+        J  = self.L + sum(b)
+        
+        if sigma != 0: Q = 0
+        
+        if a == -1: return (Q * J - R)/np.sqrt(J*(2*J+1))
+        if a ==  0: return  sigma*R/np.sqrt(J*(J+1))
+        if a == +1: return (Q*(J+1) + R)/np.sqrt((J+1)*(2*J+1))
     
 
 class TensorCodomain():
