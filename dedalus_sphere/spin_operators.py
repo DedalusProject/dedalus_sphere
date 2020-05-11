@@ -1,68 +1,86 @@
 import numpy as np
 from itertools import product
-from itertools import permutations
-
 from operators import Operator
 
 indexing = (-1,0,1)
 
 # tuple helper functions
 dual    =             lambda t: tuple(-e for e in t)
-apply   = lambda p:   lambda t: tuple(t[i] for i in p)
-sum_    = lambda k:   lambda t: sum(t[i] for i in k if 0 <= i < len(t))
+apply   = lambda p:   lambda t: tuple(t[int(i)] for i in p)
+sum_    = lambda k:   lambda t: sum(t[int(i)] for i in k if 0 <= i < len(t))
 remove  = lambda k:   lambda t: tuple(s for i,s in enumerate(t) if not i in k)
 replace = lambda j,n: lambda t: tuple(s if i!=j else n for i,s in enumerate(t))
 
 def int2tuple(func):
     return lambda *args: int(func(*[(s,) if type(s)==int else s for s in args]))
 
+def index2tuple(index,rank,indexing):
+    s = np.base_repr(index,len(indexing),rank)
+    return apply(s[(rank==0)-rank:])(indexing)
+    
+def tuple2index(tup,indexing):
+    return int('0'+''.join(str(indexing.index(s)) for s in tup),len(indexing))
+
 def indices(rank,indexing):
     return product(*(rank*(indexing,)))
 
-def tuple_array(elements,ranks,indexing):
-    T = np.zeros(tuple(len(indexing)**r for r in ranks))
-    for i, sigma in enumerate(indices(ranks[0],indexing)):
-        for j, tau in enumerate(indices(ranks[1],indexing)):
-            T[i,j] = elements[sigma,tau]
-    return T
+class TensorOperator(Operator):
 
+    def __init__(self,function,codomain,indexing=indexing):
+        Operator.__init__(self,function,codomain,Output=TensorOperator)
+        self.__indexing = indexing
+    
+    @property
+    def indexing(self):
+        return self.__indexing
+    
+    @property
+    def dimension(self):
+        return len(self.indexing)
+    
+    def __getitem__(self,i):
+        sigma,tau = i[0],i[1]
+        i = tuple2index(sigma,self.indexing)
+        j = tuple2index(tau,self.indexing)
+        return self(len(tau))[i,j]
 
-class Identity(Operator):
+    def array(self,ranks):
+        T = np.zeros(tuple(self.dimension**r for r in ranks))
+        for i, sigma in enumerate(indices(ranks[0],self.indexing)):
+            for j, tau in enumerate(indices(ranks[1],self.indexing)):
+                T[i,j] = self[sigma,tau]
+        return T
+
+class Identity(TensorOperator):
     
     def __init__(self,indexing=indexing):
         
-        def identity(rank):
-            return tuple_array(self,(rank,rank),indexing)
-        
-        Operator.__init__(self,identity,TensorCodomain(0))
+        identity = lambda rank: self.array((rank,rank))
+        TensorOperator.__init__(self,identity,TensorCodomain(0),indexing=indexing)
         
     @int2tuple
     def __getitem__(self,i):
         return i[0] == i[1]
 
 
-class Metric(Operator):
+class Metric(TensorOperator):
     
     def __init__(self,indexing=indexing):
     
-        def metric(rank):
-            return tuple_array(self,(rank,rank),indexing)
-        
-        Operator.__init__(self,metric,TensorCodomain(0))
+        metric = lambda rank: self.array((rank,rank))
+        TensorOperator.__init__(self,metric,TensorCodomain(0),indexing=indexing)
     
     @int2tuple
     def __getitem__(self,i):
         return i[0] == dual(i[1])
     
     
-class Transpose(Operator):
+class Transpose(TensorOperator):
     
     def __init__(self,permutation=(1,0),indexing=indexing):
     
-        def transpose(rank):
-            return tuple_array(self,(rank,rank),indexing)
-        
-        Operator.__init__(self,transpose,TensorCodomain(0))
+        transpose = lambda rank: self.array((rank,rank))
+        TensorOperator.__init__(self,transpose,TensorCodomain(0),indexing=indexing)
         self.__permutation = permutation
     
     @property
@@ -73,14 +91,12 @@ class Transpose(Operator):
     def __getitem__(self,i):
         return i[0] == apply(self.permutation)(i[1])
 
-class Trace(Operator):
+class Trace(TensorOperator):
     
     def __init__(self,indices=(0,1),indexing=indexing):
     
-        def trace(rank):
-            return tuple_array(self,(rank-len(indices),rank),indexing)
-        
-        Operator.__init__(self,trace,TensorCodomain(-len(indices)))
+        trace = lambda rank: self.array((rank-len(indices),rank))
+        TensorOperator.__init__(self,trace,TensorCodomain(-len(indices)),indexing=indexing)
         
         self.__indices  = indices
     
@@ -92,15 +108,13 @@ class Trace(Operator):
     def __getitem__(self,i):
         return i[0] == remove(self.indices)(i[1]) and sum_(self.indices)(i[1]) == 0
     
-class TensorProduct(Operator):
+class TensorProduct(TensorOperator):
     
     def __init__(self,element,indexing=indexing):
         if type(element) == int: element = (element,)
         
-        def product(rank):
-            return tuple_array(self,(rank+len(element),rank),indexing)
-        
-        Operator.__init__(self,product,TensorCodomain(len(element)))
+        product = lambda rank: self.array((rank+len(element),rank))
+        TensorOperator.__init__(self,product,TensorCodomain(len(element)),indexing=indexing)
         self.__element = element
     
     @property

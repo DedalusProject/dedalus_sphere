@@ -2,6 +2,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse import lil_matrix
 from scipy.sparse import identity as id_matrix
 
+
 class Operator():
     """
     Class for deffered (lazy) evaluation of matrix-valued functions between parameterised vector spaces.
@@ -66,11 +67,17 @@ class Operator():
     
     """
     
-    def __init__(self,function,codomain):
+    def __init__(self,function,codomain,Output=None):
+        if Output == None: Output = Operator
         
+        self.Output = Output
         self.__function = function
         self.__codomain = codomain
         
+    @property
+    def function(self):
+        return self.__function
+    
     @property
     def codomain(self):
         return self.__codomain
@@ -84,42 +91,46 @@ class Operator():
     def __matmul__(self,other):
         def function(*args):
             return self(*other.codomain(*args)) @ other(*args)
-        return Operator(function, self.codomain + other.codomain)
+        return self.Output(function, self.codomain + other.codomain)
     
     @property
     def T(self):
         codomain = -self.codomain
         def function(*args):
             return self(*codomain(*args)).T
-        return Operator(function,codomain)
+        return self.Output(function,codomain)
     
     @property
     def identity(self):
         def function(*args):
             return self(*args).identity
-        return  Operator(function,0*self.codomain)
+        return  self.Output(function,0*self.codomain)
         
     def __pow__(self,exponent):
-        if exponent < 0 or type(exponent) != int:
+        if exponent < 0:
             return TypeError('exponent must be a non-negative integer.')
         if exponent == 0:
             return self.identity
         return self @ self**(exponent-1)
     
     def __add__(self,other):
-        if type(other) != Operator:
+        if not isinstance(other,Operator):
             other = other*self.identity
         codomain = self.codomain | other.codomain
+        if codomain is self.codomain:
+            output = self.Output
+        else:
+            output = other.Output
         def function(*args):
             return self(*args) + other(*args)
-        return Operator(function, codomain)
+        return output(function, codomain)
     
     def __mul__(self,other):
-        if type(other) == Operator:
+        if isinstance(other,Operator):
             return self @ other - other @ self
         def function(*args):
             return other*self(*args)
-        return Operator(function,self.codomain)
+        return self.Output(function,self.codomain)
     
     def __rmul__(self,other):
             return self*other
