@@ -123,7 +123,7 @@ class Transpose(TensorOperator):
     """
     
     def __init__(self,permutation=(1,0),indexing=indexing):
-    
+        
         transpose = lambda rank: self.array((rank,rank))
         TensorOperator.__init__(self,transpose,TensorCodomain(0),indexing=indexing)
         self.__permutation = permutation
@@ -229,14 +229,14 @@ class Intertwiner(TensorOperator):
         
     Methods
     -------
-    k: int s, mu
+    k: int mu, s
         angular spherical wavenumbers.
     forbidden_spin: tuple spin
         filter spin components that don't exist.
     forbidden_regularity: tuple regularity
         filter regularity components that don't exist.
     self[sigma,a]:
-        regularity-to-spin coupling coefficients 
+        regularity-to-spin coupling coefficients
     
     """
 
@@ -250,8 +250,8 @@ class Intertwiner(TensorOperator):
     def L(self):
         return self.__ell
         
-    def k(self,s,mu):
-        return -s*np.sqrt((self.L-s*mu)*(self.L+s*mu+1)/2)
+    def k(self,mu,s):
+        return -mu*np.sqrt((self.L-s*mu)*(self.L+s*mu+1)/2)
     
     @int2tuple
     def forbidden_spin(self,spin):
