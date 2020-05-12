@@ -50,16 +50,16 @@ class TensorOperator(Operator):
         j = tuple2index(tau,self.indexing)
         return self(len(tau))[i,j]
     
-    def generator(self,rank):
+    def range(self,rank):
         return product(*(rank*(self.indexing,)))
     
     def array(self,ranks):
         T = np.zeros(tuple(self.dimension**r for r in ranks))
-        for i, sigma in enumerate(self.generator(ranks[0])):
-            for j, tau in enumerate(self.generator(ranks[1])):
+        for i, sigma in enumerate(self.range(ranks[0])):
+            for j, tau in enumerate(self.range(ranks[1])):
                 T[i,j] = self[sigma,tau]
         return T
-
+    
 class Identity(TensorOperator):
     """
     Spin/regularity space identity transformation of arbitrary rank.
