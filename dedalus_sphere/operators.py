@@ -70,9 +70,9 @@ class Operator():
     def __init__(self,function,codomain,Output=None):
         if Output == None: Output = Operator
         
-        self.Output = Output
         self.__function = function
         self.__codomain = codomain
+        self.__Output   = Output
         
     @property
     def function(self):
@@ -81,6 +81,10 @@ class Operator():
     @property
     def codomain(self):
         return self.__codomain
+    
+    @property
+    def Output(self):
+        return self.__Output
         
     def data(self,*args):
         return self(*args).toarray()
@@ -124,6 +128,10 @@ class Operator():
         def function(*args):
             return self(*args) + other(*args)
         return output(function, codomain)
+    
+    def __radd__(self,other):
+        if other == 0: return self
+        return NotImplemented
     
     def __mul__(self,other):
         if isinstance(other,Operator):
