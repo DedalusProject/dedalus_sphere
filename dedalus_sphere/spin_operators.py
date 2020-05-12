@@ -159,24 +159,38 @@ class Trace(TensorOperator):
     
 class TensorProduct(TensorOperator):
     """
-    Action of multiplication by single spin-tensor basis element
+    Action of multiplication by single spin-tensor basis element:
+        
+        e(kappa) (X) T = sum_(sigma) T(sigma) e(kappa+sigma)
+        
+        or
+        
+        T (X) e(kappa) = sum_(sigma) T(sigma) e(sigma+kappa)
     
     """
     
-    def __init__(self,element,indexing=indexing):
+    def __init__(self,element,action='left',indexing=indexing):
         if type(element) == int: element = (element,)
         
         product = lambda rank: self.array((rank+len(element),rank))
         TensorOperator.__init__(self,product,TensorCodomain(len(element)),indexing=indexing)
         self.__element = element
-    
+        self.__action  = action
+        
     @property
     def element(self):
         return self.__element
+        
+    @property
+    def action(self):
+        return self.__action
 
     @int2tuple
     def __getitem__(self,i):
-        return int(i[0] == self.element + i[1])
+        if self.action == 'left:
+            return int(i[0] == self.element + i[1])
+        if self.action == 'right:
+            return int(i[0] == i[1] + self.element)
         
 
 
