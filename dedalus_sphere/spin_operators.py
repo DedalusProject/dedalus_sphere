@@ -226,6 +226,17 @@ class Intertwiner(TensorOperator):
     ----------
     L : int
         spherical-harmonic degree
+        
+    Methods
+    -------
+    k: int s, mu
+        angular spherical wavenumbers.
+    forbidden_spin: tuple spin
+        filter spin components that don't exist.
+    forbidden_regularity: tuple regularity
+        filter regularity components that don't exist.
+    self[sigma,a]:
+        regularity-to-spin coupling coefficients 
     
     """
 
