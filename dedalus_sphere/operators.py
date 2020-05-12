@@ -47,6 +47,7 @@ class Operator():
     ----------
     codomain: an arrow between any given domain and codomain(domain).
     identity: The identity operator with the same type as self.
+    Output  : class to cast output into. It should be a subclass of Operator.
     
     Methods
     -------
@@ -118,6 +119,7 @@ class Operator():
         return self @ self**(exponent-1)
     
     def __add__(self,other):
+        if other == 0: return self
         if not isinstance(other,Operator):
             other = other*self.identity
         codomain = self.codomain | other.codomain
@@ -129,16 +131,15 @@ class Operator():
             return self(*args) + other(*args)
         return output(function, codomain)
     
-    def __radd__(self,other):
-        if other == 0: return self
-        return NotImplemented
-    
     def __mul__(self,other):
         if isinstance(other,Operator):
             return self @ other - other @ self
         def function(*args):
             return other*self(*args)
         return self.Output(function,self.codomain)
+    
+    def __radd__(self,other):
+        return self + other
     
     def __rmul__(self,other):
             return self*other
@@ -154,7 +155,10 @@ class Operator():
     
     def __sub__(self,other):
         return self + (-other)
-
+        
+    def __rsub__(self,other):
+        return -self + other
+        
 
 class infinite_csr(csr_matrix):
     """
