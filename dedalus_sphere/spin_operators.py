@@ -166,6 +166,12 @@ class TensorProduct(TensorOperator):
         or
         
         T (X) e(kappa) = sum_(sigma) T(sigma) e(sigma+kappa)
+        
+    Attributes
+    ----------
+    element: tuple
+        single tensor basis element, kappa
+    action: str ('left' or 'right')
     
     """
     
@@ -215,6 +221,11 @@ class Intertwiner(TensorOperator):
     Regularity-to-spin map.
     
         Q(ell)[spin,regularity]
+        
+    Attributes
+    ----------
+    L : int
+        spherical-harmonic degree
     
     """
 
