@@ -2,7 +2,6 @@ from scipy.sparse import csr_matrix
 from scipy.sparse import lil_matrix
 from scipy.sparse import identity as id_matrix
 
-
 class Operator():
     """
     Class for deffered (lazy) evaluation of matrix-valued functions between parameterised vector spaces.
