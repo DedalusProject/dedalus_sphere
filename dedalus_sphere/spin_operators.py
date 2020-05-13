@@ -31,17 +31,28 @@ class TensorOperator(Operator):
     
     """
 
-    def __init__(self,function,codomain,indexing=indexing):
+    def __init__(self,function,codomain,indexing=indexing,threshold=1e-9):
         Operator.__init__(self,function,codomain,Output=TensorOperator)
-        self.__indexing = indexing
+        self.__indexing  = indexing
+        self.__threshold = threshold
     
     @property
     def indexing(self):
         return self.__indexing
+        
+    @property
+    def threshold(self):
+        return self.__threshold
     
     @property
     def dimension(self):
         return len(self.indexing)
+    
+    def __call__(self,*args):
+        output = self.function(*args)
+        tiny = np.where(np.abs(output) < self.threshold)
+        output[tiny] *= 0
+        return output
     
     @int2tuple
     def __getitem__(self,i):
