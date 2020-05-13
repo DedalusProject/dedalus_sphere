@@ -3,7 +3,8 @@ from itertools import product
 from tuple_tools import *
 from operators import Operator
 
-indexing = (-1,0,1)
+indexing  = (-1,0,1)
+threshold = 1e-12
 
 class TensorOperator(Operator):
     """
@@ -31,7 +32,7 @@ class TensorOperator(Operator):
     
     """
 
-    def __init__(self,function,codomain,indexing=indexing,threshold=1e-9):
+    def __init__(self,function,codomain,indexing=indexing,threshold=threshold):
         Operator.__init__(self,function,codomain,Output=TensorOperator)
         self.__indexing  = indexing
         self.__threshold = threshold
@@ -51,7 +52,7 @@ class TensorOperator(Operator):
     def __call__(self,*args):
         output = self.function(*args)
         tiny = np.where(np.abs(output) < self.threshold)
-        output[tiny] *= 0
+        output[tiny] = 0
         return output
     
     @int2tuple
@@ -81,10 +82,10 @@ class Identity(TensorOperator):
     
     """
     
-    def __init__(self,indexing=indexing):
+    def __init__(self,**kwargs):
         
         identity = lambda rank: self.array((rank,rank))
-        TensorOperator.__init__(self,identity,TensorCodomain(0),indexing=indexing)
+        TensorOperator.__init__(self,identity,TensorCodomain(0),**kwargs)
         
     @int2tuple
     def __getitem__(self,i):
@@ -103,10 +104,10 @@ class Metric(TensorOperator):
     
     """
     
-    def __init__(self,indexing=indexing):
+    def __init__(self,**kwargs):
     
         metric = lambda rank: self.array((rank,rank))
-        TensorOperator.__init__(self,metric,TensorCodomain(0),indexing=indexing)
+        TensorOperator.__init__(self,metric,TensorCodomain(0),**kwargs)
     
     @int2tuple
     def __getitem__(self,i):
@@ -133,10 +134,10 @@ class Transpose(TensorOperator):
     
     """
     
-    def __init__(self,permutation=(1,0),indexing=indexing):
+    def __init__(self,permutation=(1,0),**kwargs):
         
         transpose = lambda rank: self.array((rank,rank))
-        TensorOperator.__init__(self,transpose,TensorCodomain(0),indexing=indexing)
+        TensorOperator.__init__(self,transpose,TensorCodomain(0),**kwargs)
         self.__permutation = permutation
     
     @property
@@ -196,11 +197,11 @@ class Trace(TensorOperator):
     
     """
     
-    def __init__(self,indices,indexing=indexing):
+    def __init__(self,indices,**kwargs):
         if type(indices) == int: indices = (indices,)
         
         trace = lambda rank: self.array((rank-len(indices),rank))
-        TensorOperator.__init__(self,trace,TensorCodomain(-len(indices)),indexing=indexing)
+        TensorOperator.__init__(self,trace,TensorCodomain(-len(indices)),**kwargs)
         
         self.__indices  = indices
     
@@ -230,11 +231,11 @@ class TensorProduct(TensorOperator):
     
     """
     
-    def __init__(self,element,action='left',indexing=indexing):
+    def __init__(self,element,action='left',**kwargs):
         if type(element) == int: element = (element,)
         
         product = lambda rank: self.array((rank+len(element),rank))
-        TensorOperator.__init__(self,product,TensorCodomain(len(element)),indexing=indexing)
+        TensorOperator.__init__(self,product,TensorCodomain(len(element)),**kwargs)
         self.__element = element
         self.__action  = action
         
@@ -294,10 +295,10 @@ class Intertwiner(TensorOperator):
     
     """
 
-    def __init__(self,L,indexing=indexing):
+    def __init__(self,L,**kwargs):
         
         intertwiner = lambda rank: self.array((rank,rank))
-        TensorOperator.__init__(self,intertwiner,TensorCodomain(0),indexing=indexing)
+        TensorOperator.__init__(self,intertwiner,TensorCodomain(0),**kwargs)
         self.__ell = L
 
     @property
