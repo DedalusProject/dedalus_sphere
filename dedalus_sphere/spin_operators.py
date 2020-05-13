@@ -151,8 +151,9 @@ class Trace(TensorOperator):
         sum_(i+j=0,k+l=0) T[..i,..j,..k,..l,..] = sum_(i+j=0) sum_(k+l=0) T[..i,..j,..k,..l,..]
     
     However, we can accomplish the latter by multiple operations over two indices.
-    On the other hand, there is no easy way to sum simultaneously
-    over more than two indices with repeted apllication
+    Conversly, repeted apllication of 2-index sums cannot sum more than two indices simultaneously.
+    
+    For a few examples:
     
         len(indices) == 0:
             Identity()
@@ -163,20 +164,19 @@ class Trace(TensorOperator):
                 V --> V[0]
             
         len(indices) == 2:
-            Traditional trace:
+            Traditional Trace((0,1)):
                 T --> T[-,+] + T[0,0] + T[+,-]
                 
-            We can get T[0,0] individually by:
-                Trace((0,)) @ Trace((1,))
+            Trace((0,)) @ Trace((1,))
+            produces T[0,0] individually.
                 
-            We can get T[-,+] + T[+,-] individually by:
-                Trace((0,1)) - Trace((0,)) @ Trace((1,))
+            Trace((0,1)) - Trace((0,)) @ Trace((1,))
+            produces T[-,+] + T[+,-] individually.
                 
         len(indices) == 3:
             R[+,-,0]+R[-,+,0] + R[+,0,-]+R[-,0,+] + R[0,+,-]+R[0,-,+] + R[0,0,0]
             
             We can select different scalars in this sum by application of lower-rank traces.
-            
             
     
     Attributes
@@ -185,8 +185,8 @@ class Trace(TensorOperator):
     
     """
     
-    @int2tuple
-    def __init__(self,indices=(0,1),indexing=indexing):
+    def __init__(self,indices,indexing=indexing):
+        if type(indices) == int: indices = (indices,)
         
         trace = lambda rank: self.array((rank-len(indices),rank))
         TensorOperator.__init__(self,trace,TensorCodomain(-len(indices)),indexing=indexing)
@@ -219,8 +219,8 @@ class TensorProduct(TensorOperator):
     
     """
     
-    @int2tuple
     def __init__(self,element,action='left',indexing=indexing):
+        if type(element) == int: element = (element,)
         
         product = lambda rank: self.array((rank+len(element),rank))
         TensorOperator.__init__(self,product,TensorCodomain(len(element)),indexing=indexing)
