@@ -271,7 +271,8 @@ class Intertwiner(TensorOperator):
     
         spin, regularity = i[0], i[1]
         
-        if spin == (): return 1
+        if spin == ():
+            return 1
 
         if self.forbidden_spin(spin) or self.forbidden_regularity(regularity):
             return 0
@@ -288,10 +289,11 @@ class Intertwiner(TensorOperator):
         R -= self.k(sigma,sum(tau))*Q
         J  = self.L + sum(b)
         
-        if sigma != 0: Q = 0
+        if sigma != 0:
+            Q = 0
         
-        if a == -1: return (Q * J - R)/np.sqrt(J*(2*J+1))
-        if a ==  0: return  sigma*R/np.sqrt(J*(J+1))
+        if a == -1: return (Q * J   - R)/np.sqrt(J*(2*J+1))
+        if a ==  0: return      sigma*R /np.sqrt(J*(J+1))
         if a == +1: return (Q*(J+1) + R)/np.sqrt((J+1)*(2*J+1))
     
 
