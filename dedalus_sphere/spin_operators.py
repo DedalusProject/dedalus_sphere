@@ -138,7 +138,50 @@ class Transpose(TensorOperator):
 
 class Trace(TensorOperator):
     """
-    Contract over arbitrary indices.
+    Class for contracting arbitrary indices down to a scalar in those indices:
+    
+        sum_(i+j=0) T[..i,..j,..]
+        
+    This can generalise to (e.g.):
+    
+        sum_(i+j+k+l=0) T[..i,..j,..k,..l,..]
+    
+    It might seem like we would prefer to do
+    
+        sum_(i+j=0,k+l=0) T[..i,..j,..k,..l,..] = sum_(i+j=0) sum_(k+l=0) T[..i,..j,..k,..l,..]
+    
+    However, we can accomplish the latter by multiple operations over two indices.
+    On the other hand, there is no easy way to sum simultaneously
+    over more than two indices with repeted apllication
+    
+        len(indices) == 0:
+            Identity()
+            S --> S
+        
+        len(indices) == 1:
+            Selects spin=0 component from given axis:
+                V --> V[0]
+            
+        len(indices) == 2:
+            Traditional trace:
+                T --> T[-,+] + T[0,0] + T[+,-]
+                
+            We can get T[0,0] individually by:
+                Trace((0,)) @ Trace((1,))
+                
+            We can get T[-,+] + T[+,-] individually by:
+                Trace((0,1)) - Trace((0,)) @ Trace((1,))
+                
+        len(indices) == 3:
+            R[+,-,0]+R[-,+,0] + R[+,0,-]+R[-,0,+] + R[0,+,-]+R[0,-,+] + R[0,0,0]
+            
+            We can select different scalars in this sum by application of lower-rank traces.
+            
+            
+    
+    Attributes
+    ----------
+    indices: tuple of -1,0,+1
     
     """
     
@@ -197,7 +240,6 @@ class TensorProduct(TensorOperator):
             return int(i[0] == self.element + i[1])
         if self.action == 'right':
             return int(i[0] == i[1] + self.element)
-        
 
 
 def xi(mu,ell):
