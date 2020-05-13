@@ -16,6 +16,8 @@ class TensorOperator(Operator):
         keeps track of the difference in rank of TensorOperators.
     indexing: tuple
         must be a permutation of (-1,+1) or (-1,0,+1)
+    threshold: float (1e-12 default)
+        send smaller values to 0.
     dimension: int
         number of basis indices.
     

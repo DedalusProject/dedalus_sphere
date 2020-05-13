@@ -8,22 +8,16 @@ replace = lambda j,n: lambda t: tuple(s if i!=j else n for i,s in enumerate(t))
 
 # converts integer args to tuple singleton i --> (i,).
 def int2tuple(func):
-    if func.__name__ in ('__init__','__getitem__'):
-        def wrapper(*args,**kwargs):
-            for kw in kwargs:
-                if type(kwargs[kw]) == int:
-                    kwargs[kw] = (kwargs[kw],)
-            self = args[0]
-            if len(args) == 1:
-                return func(self,**kwargs)
-            args = args[1]
-            if type(args) == int:
-                return func(self,(args,),**kwargs)
+    if func.__name__ == '__getitem__':
+        def wrapper(*args):
+            self, args = args[0], args[1]
+            if type(args) == slice: return func(self,(args,))
+            if type(args) ==   int: return func(self,(args,))
             args = (self,tuple((s,) if type(s)==int else s for s in args))
-            return func(*args,**kwargs)
+            return func(*args)
         return wrapper
     return lambda *args: func(*tuple((s,) if type(s)==int else s for s in args))
-
+        
 # forward and inverse mapping between spin/regularity elements and integers.
 def tuple2index(tup,indexing):
     return int('0'+''.join(str(indexing.index(s)) for s in tup),len(indexing))
