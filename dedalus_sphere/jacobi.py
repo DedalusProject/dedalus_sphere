@@ -430,8 +430,12 @@ class JacobiCodomain():
     
     """
     
-    def __init__(self,dn,da,db,pi):
+    def __init__(self,dn=0,da=0,db=0,pi=0):
         self.__arrow = (dn,da,db,pi)
+    
+    @property
+    def arrow(self):
+        return self.__arrow
     
     def __getitem__(self,item):
         return self.__arrow[(item)]
@@ -446,29 +450,6 @@ class JacobiCodomain():
     
     def __add__(self,other):
         return JacobiCodomain(*self(*other[:3],evaluate=False),self[3]^other[3])
-    
-    def __mul__(self,other):
-        if type(other) != int:
-            raise TypeError('only integer multiplication defined.')
-        
-        if other == 0:
-            return JacobiCodomain(0,0,0,0)
-        
-        if other < 0:
-            return -self + (other+1)*self
-            
-        return self + (other-1)*self
-    
-    def __rmul__(self,other):
-        return self*other
-    
-    def __neg__(self):
-        a,b = -self[1],-self[2]
-        if self[3]: a,b = b,a
-        return JacobiCodomain(-self[0],a,b,self[3])
-    
-    def __sub__(self,other):
-        return self + (-other)
     
     def __call__(self,*args,evaluate=True):
         n,a,b = args[:3]
@@ -487,4 +468,28 @@ class JacobiCodomain():
         if self[0] >= other[0]:
             return self
         return other
+    
+    def __neg__(self):
+        a,b = -self[1],-self[2]
+        if self[3]: a,b = b,a
+        return JacobiCodomain(-self[0],a,b,self[3])
+    
+    def __mul__(self,other):
+        if type(other) != int:
+            raise TypeError('only integer multiplication defined.')
+        
+        if other == 0:
+            return JacobiCodomain()
+        
+        if other < 0:
+            return -self + (other+1)*self
+            
+        return self + (other-1)*self
+    
+    def __rmul__(self,other):
+        return self*other
+    
+    def __sub__(self,other):
+        return self + (-other)
+    
     

@@ -172,9 +172,9 @@ class infinite_csr(csr_matrix):
     Attributes
     ----------
     self.T: transpose.
-        csr_matrix traspose returns csc_matrix type.
+        because csr_matrix.T returns csc_matrix.
     self.identity:
-        returns the identity matrix with the same number of columns.
+        returns square identity matrix with the number of columns of self.
         
     Methods
     -------
@@ -184,6 +184,13 @@ class infinite_csr(csr_matrix):
 
     def __init__(self,*args,**kwargs):
         csr_matrix.__init__(self,*args,**kwargs)
+    
+    def __repr__(self):
+        s = csr_matrix(self).__repr__()
+        i = s.find('sparse matrix')
+        j = s.find('with')
+        k = s.find('stored elements')
+        return s[:i] + 'Infinite Compressed Sparse Row matrix; ' + s[j:k+15] + '>'
     
     @property
     def T(self):

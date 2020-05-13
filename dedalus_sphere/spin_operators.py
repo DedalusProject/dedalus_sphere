@@ -193,9 +193,9 @@ class TensorProduct(TensorOperator):
 
     @int2tuple
     def __getitem__(self,i):
-        if self.action == 'left:
+        if self.action == 'left':
             return int(i[0] == self.element + i[1])
-        if self.action == 'right:
+        if self.action == 'right':
             return int(i[0] == i[1] + self.element)
         
 
@@ -303,7 +303,7 @@ class TensorCodomain():
     Attributes
     ----------
     arrow: int
-    relative chnage in rank between input and output.
+        relative change in rank between input and output.
     
     
     """
