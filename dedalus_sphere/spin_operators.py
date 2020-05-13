@@ -185,8 +185,9 @@ class Trace(TensorOperator):
     
     """
     
+    @int2tuple
     def __init__(self,indices=(0,1),indexing=indexing):
-    
+        
         trace = lambda rank: self.array((rank-len(indices),rank))
         TensorOperator.__init__(self,trace,TensorCodomain(-len(indices)),indexing=indexing)
         
@@ -218,8 +219,8 @@ class TensorProduct(TensorOperator):
     
     """
     
+    @int2tuple
     def __init__(self,element,action='left',indexing=indexing):
-        if type(element) == int: element = (element,)
         
         product = lambda rank: self.array((rank+len(element),rank))
         TensorOperator.__init__(self,product,TensorCodomain(len(element)),indexing=indexing)
