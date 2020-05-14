@@ -5,7 +5,7 @@ from operators import infinite_csr, Operator
 
 dtype='float64'
 
-def polynomials(n,a,b,z,Newton=False,init=None,normalised=True,dtype=dtype,internal='float128'):
+def polynomials(n,a,b,z,init=None,Newton=False,normalised=True,dtype=dtype,internal='float128'):
     """
     Jacobi polynomials, P(n,a,b,z), of type (a,b) up to degree n-1.
     
@@ -25,7 +25,7 @@ def polynomials(n,a,b,z,Newton=False,init=None,normalised=True,dtype=dtype,inter
     
     """
     
-    if init == None:
+    if init is None:
         init = 1 + 0*z
         if normalised:
             init /= np.sqrt(mass(a,b),dtype=internal)
@@ -123,7 +123,7 @@ def operator(name,normalised=True,dtype=dtype):
         return (B(-1) @ B(+1) - A(-1) @ A(+1))/2
     return JacobiOperator(name,normalised=normalised,dtype=dtype)
    
-def measure(z,a,b,normalised=True,log=False):
+def measure(a,b,z,normalised=True,log=False):
     """
     
     mu(a,b,z) = (1-z)**a (1+z)**b
@@ -141,13 +141,13 @@ def measure(z,a,b,normalised=True,log=False):
         return w
         
     if a <= 1 and b <= 1:
-        return np.log(measure(z,a,b,normalised=normalised))
+        return np.log(measure(a,b,z,normalised=normalised))
 
     ia, ib = int(a), int(b)
 
     a, b = a - ia, b - ib
 
-    S = ia*np.log(1-z) + ib*np.log(1+z) + measure(z,a,b,normalised=False,log=True)
+    S = ia*np.log(1-z) + ib*np.log(1+z) + measure(a,b,z,normalised=False,log=True)
     
     if normalised: S -= mass(a+ia,b+ib,log=True)
     return S
@@ -299,10 +299,10 @@ class JacobiOperator():
     
     def __init__(self,name,normalised=True,dtype=dtype):
         
-        self.__normalised = normalised
         self.__function   = getattr(self,f'_JacobiOperator__{name}')
+        self.__normalised = normalised
         self.dtype        = dtype
-    
+        
     @property
     def normalised(self):
         return self.__normalised
@@ -395,6 +395,8 @@ class JacobiOperator():
             return infinite_csr(banded((np.arange(n,dtype=dtype),[0]),(max(n,0),max(n,0))))
         
         return Operator(N,JacobiCodomain(0,0,0,0))
+        
+        
         
 class JacobiCodomain():
     """
