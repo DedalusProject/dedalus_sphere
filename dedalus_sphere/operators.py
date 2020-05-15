@@ -24,10 +24,16 @@ class Operator():
     The composition rule need not be commutative, but it often is.
     
     Operators with compatible codomains form a linear vector space.
+    
+    For scalar multiplication:
+    
+        codomain(a*A) = codomain(A)
+    
+    For addition:
 
-        a*A + b*B : domain in D --> codomain(A|B)(domain) in D,
+        A + B : domain in D --> codomain(A+B)(domain) in D,
         
-    where codomain(A|B) = codomain(A) or codomain(B), provided they are compatible.
+    where codomain(A+B) = codomain(A) or codomain(B), provided they are compatible.
     
     For a given operator, we can define the inverse codomain such that,
         
@@ -86,9 +92,6 @@ class Operator():
     def Output(self):
         return self.__Output
         
-    def data(self,*args):
-        return self(*args).toarray()
-    
     def __call__(self,*args):
         return self.__function(*args)
     
@@ -112,23 +115,24 @@ class Operator():
         
     def __pow__(self,exponent):
         if exponent < 0:
-            return TypeError('exponent must be a non-negative integer.')
+            raise TypeError('exponent must be a non-negative integer.')
         if exponent == 0:
             return self.identity
         return self @ self**(exponent-1)
     
     def __add__(self,other):
+    
         if other == 0: return self
         if not isinstance(other,Operator):
             other = other*self.identity
+            
         codomain = self.codomain | other.codomain
-        if codomain is self.codomain:
-            output = self.Output
-        else:
-            output = other.Output
+        output   = self if codomain is self.codomain else other
+           
         def function(*args):
             return self(*args) + other(*args)
-        return output(function, codomain)
+            
+        return output.Output(function, codomain)
     
     def __mul__(self,other):
         if isinstance(other,Operator):
@@ -159,6 +163,8 @@ class Operator():
         return -self + other
         
 
+import numpy as np
+
 class infinite_csr(csr_matrix):
     """
     Base class for extendable addition with csr_matrix types.
@@ -170,6 +176,8 @@ class infinite_csr(csr_matrix):
     
     Attributes
     ----------
+    self.square:s
+        returns square array given by number of columns.
     self.T: transpose.
         because csr_matrix.T returns csc_matrix.
     self.identity:
@@ -177,7 +185,10 @@ class infinite_csr(csr_matrix):
         
     Methods
     -------
-    self + other: row-extendable addition.
+    self[item]: item = int, or slice.
+        row-extendable slicing. Returns zero-padded array if sliced beyond self.shape[0]
+    self + other:
+        row-extendable addition.
     
     """
 
@@ -199,6 +210,32 @@ class infinite_csr(csr_matrix):
     def identity(self):
         return infinite_csr(id_matrix(self.shape[1]))
     
+    @property
+    def square(self):
+        return self[:self.shape[1]]
+    
+    def __getitem__(self,item):
+   
+        if type(item) == tuple:
+            i, j = item[0], item[1:]
+        else:
+            i, j = item, ()
+            
+        if type(i) != slice:
+            i = slice(i, i+1, 1)
+        
+        s = self.shape
+        
+        if i.stop == None or i.stop < s[0]:
+            return infinite_csr(csr_matrix(self)[item])
+    
+        output = lil_matrix((i.stop+1,s[1]), dtype=self.dtype)
+        
+        output[:s[0]] = csr_matrix(self)
+        
+        return infinite_csr(output[(i,) + j])
+    
+    
     def __add__(self,other):
         
         ns, no = self.shape[0], other.shape[0]
@@ -213,6 +250,7 @@ class infinite_csr(csr_matrix):
         if ns < no:
             sum_ = lil_matrix(other)
             sum_[:ns] += self
+        
         
         return infinite_csr(sum_)
         
