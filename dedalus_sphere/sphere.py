@@ -25,13 +25,14 @@ def spin2Jacobi(Lmax,m,s,ds=None,dm=None):
     n    = Lmax + 1 - max(abs(m),abs(s))
     a, b = abs(m+s), abs(m-s)
   
-    if ds == ds == None:
+    if ds == dm == None:
         return n,a,b
 
     if ds == None: ds = 0
     if dm == None: dm = 0
 
-    m, s = m+dm, s+ds
+    m += dm
+    s += ds
     
     dn    = Lmax + 1 - max(abs(m),abs(s)) - n
     da,db = abs(m+s) - a, abs(m-s) - b
@@ -127,7 +128,9 @@ class SphereOperator():
         def Sin(Lmax,m,s):
 
             n,a,b,dn,da,db = spin2Jacobi(Lmax,m,s,ds=ds)
-
+            
+            print(da,db,n,a,b)
+            
             S = Jacobi.operator('A')(da) @ Jacobi.operator('B')(db)
 
             return (da*ds) * S(n,a,b)
