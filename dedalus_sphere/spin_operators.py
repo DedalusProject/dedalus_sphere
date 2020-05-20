@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import product
 from tuple_tools import *
-from operators import Operator
+from operators import Operator, Codomain
 
 indexing  = (-1,0,1)
 threshold = 1e-12
@@ -213,6 +213,7 @@ class Trace(TensorOperator):
     
     @int2tuple
     def __getitem__(self,i):
+        
         return int(i[0] == remove(self.indices)(i[1]) and sum_(self.indices)(i[1]) == 0)
     
 class TensorProduct(TensorOperator):
@@ -354,7 +355,7 @@ class Intertwiner(TensorOperator):
         if a == +1: return (Q*(J+1) + R)/np.sqrt((J+1)*(2*J+1))
     
 
-class TensorCodomain():
+class TensorCodomain(Codomain):
     """
     Class for keeping track of TensorOperator codomains.
     
@@ -368,45 +369,8 @@ class TensorCodomain():
     """
 
     def __init__(self,rank_change):
-        self.__arrow = rank_change
+        Codomain.__init__(self,rank_change,Output=TensorCodomain)
         
-    @property
-    def arrow(self):
-        return self.__arrow
-
     def __str__(self):
         s = f'(rank->rank+{self.arrow})'
         return s.replace('+0','').replace('+-','-')
-
-    def __repr__(self):
-        return str(self)
-        
-    def __add__(self,other):
-        return TensorCodomain(self.arrow+other.arrow)
-
-    def __call__(self,other):
-        if self.arrow + other < 0:
-            raise ValueError('cannot map to negative rank.')
-        return (self.arrow + other,)
-        
-    def __eq__(self,other):
-        return self.arrow == other.arrow
-        
-    def __or__(self,other):
-        if self != other:
-            raise TypeError('operators have incompatible codomains.')
-        return self
-        
-    def __neg__(self):
-        return (-1)*self
-        
-    def __mul__(self,other):
-        if type(other) != int:
-            raise TypeError('only integer multiplication defined.')
-        return TensorCodomain(other*self.arrow)
-
-    def __rmul__(self,other):
-        return self*other
-
-    def __sub__(self,other):
-        return self + (-other)

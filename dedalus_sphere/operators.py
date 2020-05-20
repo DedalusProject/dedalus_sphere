@@ -163,8 +163,78 @@ class Operator():
         return -self + other
         
 
-import numpy as np
+class Codomain():
+    """Base class for Codomain objects.
+    
+    
+    Attributes
+    ----------
+    
+    
+    Methods
+    -------
+    
+    
+    """
 
+    def __init__(self,*arrow,Output=None):
+        if Output == None: Output = Operator
+        
+        self.__arrow  = arrow
+        self.__Output = Output
+        
+    @property
+    def arrow(self):
+        return self.__arrow
+        
+    @property
+    def Output(self):
+        return self.__Output
+    
+    def __getitem__(self,item):
+        return self.__arrow[(item)]
+        
+    def __str__(self):
+        return str(self.arrow)
+    
+    def __rerp__(self):
+        return str(self)
+        
+    def __add__(self,other):
+        return self.Output(*self(*other.arrow))
+    
+    def __call__(self,*args):
+        return tuple(a+b for a,b in zip(self.arrow,args))
+
+    def __eq__(self,other):
+        return self[:] == other[:]
+    
+    def __or__(self,other):
+        if self != other:
+            raise TypeError('operators have incompatible codomains.')
+        return self
+    
+    def __neg__(self):
+        return self.Output(*tuple(-a for a in self.arrow))
+    
+    def __mul__(self,other):
+        if type(other) != int:
+            raise TypeError('only integer multiplication defined.')
+    
+        if other == 0:
+            return self.Output(*(len(self.arrow)*(0,)))
+        
+        if other < 0:
+            return -self + (other+1)*self
+            
+    def __rmul__(self,other):
+        return self*other
+    
+    def __sub__(self,other):
+        return self + (-other)
+        
+        
+    
 class infinite_csr(csr_matrix):
     """
     Base class for extendable addition with csr_matrix types.
@@ -185,7 +255,7 @@ class infinite_csr(csr_matrix):
         
     Methods
     -------
-    self[item]: item = int, or slice.
+    self[item]: item = int(s), or slice(s).
         row-extendable slicing. Returns zero-padded array if sliced beyond self.shape[0]
     self + other:
         row-extendable addition.

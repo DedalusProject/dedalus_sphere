@@ -1,7 +1,7 @@
 import numpy             as np
 from scipy.sparse import dia_matrix as banded
 
-from operators import infinite_csr, Operator
+from operators import Operator, Codomain, infinite_csr
 
 dtype='float64'
 
@@ -199,6 +199,7 @@ def norm_ratio(dn,da,db,n,a,b,squared=False):
         raise TypeError('can only increment by integers.')
     
     def tricky(n,a,b):
+        # 0/0 = 1
         if a+b != -1:
             return (2*n+a+b+1)/(n+a+b+1)
         return 2 - (n==0)
@@ -398,7 +399,7 @@ class JacobiOperator():
         
         
         
-class JacobiCodomain():
+class JacobiCodomain(Codomain):
     """
     Base class for Jacobi codomain.
     
@@ -432,26 +433,17 @@ class JacobiCodomain():
     
     """
     
-    def __init__(self,dn=0,da=0,db=0,pi=0):
-        self.__arrow = (dn,da,db,pi)
-    
-    @property
-    def arrow(self):
-        return self.__arrow
-    
-    def __getitem__(self,item):
-        return self.__arrow[(item)]
+    def __init__(self,dn=0,da=0,db=0,pi=0,Output=None):
+        if Output == None: Output = JacobiCodomain
+        Codomain.__init__(self,*(dn,da,db,pi),Output=Output)
     
     def __str__(self):
         s = f'(n->n+{self[0]},a->a+{self[1]},b->b+{self[2]})'
         if self[3]: s = s.replace('a->a','a->b').replace('b->b','b->a')
         return s.replace('+0','').replace('+-','-')
         
-    def __repr__(self):
-        return str(self)
-    
     def __add__(self,other):
-        return JacobiCodomain(*self(*other[:3],evaluate=False),self[3]^other[3])
+        return self.Output(*self(*other[:3],evaluate=False),self[3]^other[3])
     
     def __call__(self,*args,evaluate=True):
         n,a,b = args[:3]
@@ -460,6 +452,12 @@ class JacobiCodomain():
         if evaluate and (a <= -1 or b <= -1):
             raise ValueError('invalid Jacobi parameter.')
         return n,a,b
+    
+    def __neg__(self):
+        a,b = -self[1],-self[2]
+        if self[3]: a,b = b,a
+        return self.Output(-self[0],a,b,self[3])
+
     
     def __eq__(self,other):
         return self[1:] == other[1:]
@@ -470,28 +468,3 @@ class JacobiCodomain():
         if self[0] >= other[0]:
             return self
         return other
-    
-    def __neg__(self):
-        a,b = -self[1],-self[2]
-        if self[3]: a,b = b,a
-        return JacobiCodomain(-self[0],a,b,self[3])
-    
-    def __mul__(self,other):
-        if type(other) != int:
-            raise TypeError('only integer multiplication defined.')
-        
-        if other == 0:
-            return JacobiCodomain()
-        
-        if other < 0:
-            return -self + (other+1)*self
-            
-        return self + (other-1)*self
-    
-    def __rmul__(self,other):
-        return self*other
-    
-    def __sub__(self,other):
-        return self + (-other)
-    
-    

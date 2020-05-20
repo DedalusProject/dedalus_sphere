@@ -1,5 +1,6 @@
 import numpy             as np
 import jacobi            as Jacobi
+from jacobi              import JacobiCodomain
 from scipy.sparse import dia_matrix as banded
 from operators    import Operator, infinite_csr
 
@@ -129,8 +130,6 @@ class SphereOperator():
 
             n,a,b,dn,da,db = spin2Jacobi(Lmax,m,s,ds=ds)
             
-            print(da,db,n,a,b)
-            
             S = Jacobi.operator('A')(da) @ Jacobi.operator('B')(db)
 
             return (da*ds) * S(n,a,b)
@@ -186,65 +185,23 @@ class SphereOperator():
         return Operator(S,SphereCodomain(0,0,0,0))
     
 
-class SphereCodomain():
+class SphereCodomain(JacobiCodomain):
     
     def __init__(self,dL=0,dm=0,ds=0,pi=0):
-        self.__arrow = (dL,dm,ds,pi)
+        JacobiCodomain.__init__(self,*(dL,dm,ds,pi),Output=SphereCodomain)
         
-    @property
-    def arrow(self):
-        return self.__arrow
-    
-    def __getitem__(self,item):
-        return self.__arrow[(item)]
-    
     def __str__(self):
         s = f'(L->L+{self[0]},m->m+{self[1]},s->s+{self[2]})'
         if self[3]: s = s.replace('s->s','s->-s')
         return s.replace('+0','').replace('+-','-')
         
-    def __repr__(self):
-        return str(self)
-    
-    def __add__(self,other):
-        return SphereCodomain(*self(*other[:3],evaluate=False),self[3]^other[3])
-    
     def __call__(self,*args,evaluate=True):
         L,m,s = args[:3]
         if self[3]: s *= -1
         return self[0] + L, self[1] + m, self[2] + s
-    
-    def __eq__(self,other):
-        return self[1:] == other[1:]
-    
-    def __or__(self,other):
-        if self != other:
-            raise TypeError('operators have incompatible codomains.')
-        if self[0] >= other[0]:
-            return self
-        return other
     
     def __neg__(self):
         m,s = -self[1],-self[2]
         if self[3]: s *= -1
         return SphereCodomain(-self[0],m,s,self[3])
     
-    def __mul__(self,other):
-        if type(other) != int:
-            raise TypeError('only integer multiplication defined.')
-        
-        if other == 0:
-            return SphereCodomain()
-        
-        if other < 0:
-            return -self + (other+1)*self
-            
-        return self + (other-1)*self
-    
-    def __rmul__(self,other):
-        return self*other
-    
-    def __sub__(self,other):
-        return self + (-other)
-    
-
