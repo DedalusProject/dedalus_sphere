@@ -115,20 +115,31 @@ def measure(a,b,z,probability=True,log=False):
     """
     
     if not log:
-        w = (1-z)**a * (1+z)**b
-        if probability: w /= mass(a,b)
+        
+        w = 1
+        
+        if a != 0:
+            w *= (1-z)**a
+        
+        if b != 0:
+            w *= (1+z)**b
+        
+        if probability:
+            w /= mass(a,b)
+            
         return w
         
-    if a <= 1 and b <= 1:
-        return np.log(measure(a,b,z,probability=probability))
-
-    ia, ib = int(a), int(b)
-
-    a, b = a - ia, b - ib
-
-    S = ia*np.log(1-z) + ib*np.log(1+z) + measure(a,b,z,probability=False,log=True)
+    S = 0
     
-    if probability: S -= mass(a+ia,b+ib,log=True)
+    if a != 0:
+        S += a*np.log(1-z)
+        
+    if b != 0:
+        S += b*np.log(1+z)
+    
+    if probability:
+        S -= mass(a,b,log=True)
+        
     return S
 
 def mass(a,b,log=False):
