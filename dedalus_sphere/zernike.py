@@ -1,38 +1,38 @@
 import numpy as np
 import jacobi  as Jacobi
 from  jacobi import JacobiCodomain
+from operators    import Operator, infinite_csr
 
-# The defalut configurations for the base Jacobi parameter.
+
+# The defalut configuration for the base Jacobi parameter.
 alpha = 0
 
-def quadrature(dimension,n,**kwargs):
+def quadrature(dimension,n,k=alpha):
     """
     Weights associated with
-        dV = (1-r*r)**alpha * r**(dimension-1) dr, where 0 <= r <= 1.
+        dV = (1-r*r)**k * r**(dimension-1) dr, where 0 <= r <= 1.
         
     """
     
-    z, w = Jacobi.quadrature(*regularity2Jacobi(dimension,n,0,0,0,**kwargs))
+    z, w = Jacobi.quadrature(n,k,dimension/2 - 1)
     
-    w /= 2**( alpha + dimension/2 + 1 )
+    w /= 2**( k + dimension/2 + 1 )
     
     return z, w
 
-
-def regularity2Jacobi(dimension,n,k,ell,degree,alpha=alpha):
+def regularity2Jacobi(dimension,n,k,ell):
     
-    if type(degree) != tuple: degree = (degree,degree)
+    n = n - nmin(ell)
+    a = k
+    b = ell + dimension/2 - 1
     
-    a = k + alpha
-    b = ell + degree[0] + dimension/2 - 1
-    n = n - nmin(ell,degree[1])
-
     return n,a,b
+    
+def nmin(ell):
+    return max(ell//2,0)
 
-def nmin(ell,degree):
-    return max((ell + degree)//2,0)
 
-def polynomials(dimension,n,ell,degree,z,alpha=alpha):
+def polynomials(dimension,n,k,ell,z):
     """
         Unit normalised:
             
@@ -40,36 +40,93 @@ def polynomials(dimension,n,ell,degree,z,alpha=alpha):
     
     """
     
-    a, b = regularity2Jacobi(dimension,n,0,ell,degree,alpha=alpha)[1:]
-
-    init  = Jacobi.measure(0,ell+degree,z,log=True)
-    init -= Jacobi.mass(a,b,log=True)  - np.log(2)*(dimension/2 + 2)
+    init  = Jacobi.measure(0,ell,z,log=True,probability=False)
     
-    return Jacobi.polynomials(n,a,b,z,np.exp(0.5*init))
+    ell += dimension/2 - 1
+    
+    init -= Jacobi.mass(k,ell,log=True)  - np.log(2)*(k + dimension/2 + 1)
+    init = np.exp(0.5*init)
+    
+    return Jacobi.polynomials(n,k,ell,z,init)
 
 
-def operator(dimension,name,**kwargs):
-     
-    #    Ball : (Jacobi,rescale)
-    O = {'D-' : ('C+',np.sqrt(8.0)/radius),   # d/dr + (ell+1)/r
-         'D+' : ('D+',np.sqrt(8.0)/radius),   # d/dr -  ell/r
-         'R-' : ('B-',np.sqrt(0.5)*radius),   # r multiplication
-         'R+' : ('B+',np.sqrt(0.5)*radius),   # r multiplication
-          'Z' : ('J',1),                      # z = 2*(r/R)**2 - 1 multiplication
-          'I' : ('I',1),                      # identity
-          'E' : ('A+',1),                     # conversion
-          '0' : ('0',1),                      # zeros
-        'r=R' : ('z=+1',2**((ell+degree)/2))} # boundary restriction
-                                      
-    a, b, N = _regularity2Jacobi(dimension,Nmax+pad,k,ell,(degree,0),alpha=alpha)
+def operator(dimension,name):
+    """
+    Interface to base ZernikeOperator class.
 
-    return Jacobi.operator(O[op][0],N,a,b,rescale=O[op][1])
+    Parameters
+    ----------
 
+    """
+    
+    if name == 'Z':
+        def Z(n,k,ell):
+            ell += dimension/2 - 1
+            return Jacobi.operator('Z')(n,k,ell)
+        return Operator(Z,ZernikeCodomain(1,0,0))
+        
+    return ZernikeOperator(dimension,name)
 
+class ZernikeOperator():
+    
+    def __init__(self,dimension,name,radius=1):
+            
+        self.__function   = getattr(self,f'_ZernikeOperator__{name}')
+        
+        self.__dimension = dimension
+        self.__radius    = radius
+        
+            
+    def __call__(self,p):
+        return Operator(*self.__function(p))
+    
+    @property
+    def dimension(self):
+        return self.__dimension
+    
+    @property
+    def radius(self):
+        return self.__radius
+    
+    def __D(self,dl):
+        
+        def D(n,k,ell):
+            
+            D = Jacobi.operator('D' if dl > 0 else 'C')(+1)
+            
+            ell += self.dimension/2 - 1
+            
+            return  (2/self.radius)*D(n,k,ell)
+    
+        return D, ZernikeCodomain(-(1+dl)//2,1,dl)
+        
+        
+    def __E(self,dk):
+        
+        def E(n,k,ell):
+            
+            ell += self.dimension/2 - 1
+            
+            return  np.sqrt(0.5)*Jacobi.operator('A')(dk)(n,k,ell)
+    
+        return E, ZernikeCodomain((1-dk)//2,dk,0)
+        
+    
+    def __R(self,dl):
+
+        def R(n,k,ell):
+
+            ell += self.dimension/2 - 1
+            
+            return (np.sqrt(0.5)*self.radius)*Jacobi.operator('B')(dl)(n,k,ell)
+
+        return R, ZernikeCodomain((1-dl)//2,0,dl)
+    
+    
 class ZernikeCodomain(JacobiCodomain):
 
-    def __init__(self,dn=0,dk=0,dl=0):
-        JacobiCodomain.__init__(self,dn,dk,dl,0,output=ZernikeCodomain)
+    def __init__(self,dn=0,dk=0,dl=0,pi=0):
+        JacobiCodomain.__init__(self,dn,dk,dl,0,Output=ZernikeCodomain)
     
     def __str__(self):
         s = f'(n->n+{self[0]},k->k+{self[1]},l->l+{self[2]})'

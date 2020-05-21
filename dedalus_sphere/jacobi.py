@@ -100,56 +100,35 @@ def grid_guess(n,a,b,dtype='float128'):
     """
     return np.cos(np.pi*(np.arange(4*n-1,2,-4,dtype=dtype)+2*a)/(4*n+2*(a+b+1)))
  
-def operator(name,normalised=True,dtype=dtype):
-    """
-    Interface to base JacobiOperator class.
-    
-    Parameters
-    ----------
-    name: A, B, C, D, Id, Pi, N, Z (Jacobi matrix)
-    normalised: True --> unit-integral, False --> classical.
-    dtype: output dtype
-    
-    """
-    if name == 'Id':
-        return JacobiOperator.identity(dtype=dtype)
-    if name == 'Pi':
-        return JacobiOperator.parity(dtype=dtype)
-    if name == 'N':
-        return JacobiOperator.number(dtype=dtype)
-    if name == 'Z':
-        A = JacobiOperator('A',normalised=normalised,dtype=dtype)
-        B = JacobiOperator('B',normalised=normalised,dtype=dtype)
-        return (B(-1) @ B(+1) - A(-1) @ A(+1))/2
-    return JacobiOperator(name,normalised=normalised,dtype=dtype)
-   
-def measure(a,b,z,normalised=True,log=False):
+ 
+def measure(a,b,z,probability=True,log=False):
     """
     
     mu(a,b,z) = (1-z)**a (1+z)**b
     
-    optionally:  ((1-z)/2)**a ((1+z)/2)**b / (2*Beta(a+1,b+1))
+    if normalised:  ((1-z)/2)**a ((1+z)/2)**b / (2*Beta(a+1,b+1))
     
     Parameters
     ----------
     a,b > -1
     
     """
+    
     if not log:
         w = (1-z)**a * (1+z)**b
-        if normalised: w /= mass(a,b)
+        if probability: w /= mass(a,b)
         return w
         
     if a <= 1 and b <= 1:
-        return np.log(measure(a,b,z,normalised=normalised))
+        return np.log(measure(a,b,z,probability=probability))
 
     ia, ib = int(a), int(b)
 
     a, b = a - ia, b - ib
 
-    S = ia*np.log(1-z) + ib*np.log(1+z) + measure(a,b,z,normalised=False,log=True)
+    S = ia*np.log(1-z) + ib*np.log(1+z) + measure(a,b,z,probability=False,log=True)
     
-    if normalised: S -= mass(a+ia,b+ib,log=True)
+    if probability: S -= mass(a+ia,b+ib,log=True)
     return S
 
 def mass(a,b,log=False):
@@ -224,6 +203,29 @@ def norm_ratio(dn,da,db,n,a,b,squared=False):
         return np.sqrt(ratio)
     return ratio
         
+
+def operator(name,normalised=True,dtype=dtype):
+    """
+    Interface to base JacobiOperator class.
+
+    Parameters
+    ----------
+    name: A, B, C, D, Id, Pi, N, Z (Jacobi matrix)
+    normalised: True --> unit-integral, False --> classical.
+    dtype: output dtype
+
+    """
+    if name == 'Id':
+        return JacobiOperator.identity(dtype=dtype)
+    if name == 'Pi':
+        return JacobiOperator.parity(dtype=dtype)
+    if name == 'N':
+        return JacobiOperator.number(dtype=dtype)
+    if name == 'Z':
+        A = JacobiOperator('A',normalised=normalised,dtype=dtype)
+        B = JacobiOperator('B',normalised=normalised,dtype=dtype)
+        return (B(-1) @ B(+1) - A(-1) @ A(+1))/2
+    return JacobiOperator(name,normalised=normalised,dtype=dtype)
 
 class JacobiOperator():
     """
@@ -458,7 +460,6 @@ class JacobiCodomain(Codomain):
         if self[3]: a,b = b,a
         return self.Output(-self[0],a,b,self[3])
 
-    
     def __eq__(self,other):
         return self[1:] == other[1:]
     

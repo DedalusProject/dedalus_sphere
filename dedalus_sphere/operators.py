@@ -197,7 +197,7 @@ class Codomain():
     def __str__(self):
         return str(self.arrow)
     
-    def __rerp__(self):
+    def __repr__(self):
         return str(self)
         
     def __add__(self,other):

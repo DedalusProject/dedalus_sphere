@@ -41,7 +41,7 @@ def spin2Jacobi(Lmax,m,s,ds=None,dm=None):
     return n,a,b,dn,da,db
 
 
-def harmonics(Lmax,m,s,cos_theta,dtype=dtype):
+def harmonics(Lmax,m,s,cos_theta,**kwargs):
     """
         Gives spin-wieghted spherical harmonic functions on the Gauss quaduature grid.
         Returns an array with
@@ -59,13 +59,13 @@ def harmonics(Lmax,m,s,cos_theta,dtype=dtype):
     
     n,a,b = spin2Jacobi(Lmax,m,s)
     
-    init = np.exp(0.5*Jacobi.measure(a,b,cos_theta,log=True).astype('float128'))
+    init = np.exp(0.5*Jacobi.measure(a,b,cos_theta,log=True))
     init *= ((-1.)**max(m,-s))
     
-    return Jacobi.polynomials(n,a,b,cos_theta,init,dtype='float128').astype(dtype)
+    return Jacobi.polynomials(n,a,b,cos_theta,init,**kwargs)
 
 
-def operator(name,**kwargs):
+def operator(name,dtype=dtype):
     """
     Interface to base ShereOperator class.
     
@@ -75,35 +75,37 @@ def operator(name,**kwargs):
     """
     
     if name == 'Id':
-        return SphereOperator.identity
+        return SphereOperator.identity(dtype=dtype)
         
     if name == 'Pi':
-        return SphereOperator.parity
+        return SphereOperator.parity(dtype=dtype)
     
     if name == 'L':
-        return SphereOperator.L()
+        return SphereOperator.L(dtype=dtype)
     
     if name == 'M':
-        return SphereOperator.M()
+        return SphereOperator.M(dtype=dtype)
     
     if name == 'S':
-        return SphereOperator.S()
+        return SphereOperator.S(dtype=dtype)
     
     if name == 'Cos':
         def Cos(Lmax,m,s):
-            return Jacobi.operator('Z')(*spin2Jacobi(Lmax,m,s))
+            return Jacobi.operator('Z',dtype=dtype)(*spin2Jacobi(Lmax,m,s))
         return Operator(Cos,SphereCodomain(1,0,0,0))
         
-    return SphereOperator(name,**kwargs)
+    return SphereOperator(name,dtype=dtype)
 
 
 class SphereOperator():
     
-    def __init__(self,name,radius=1):
+    def __init__(self,name,radius=1,dtype=dtype):
             
         self.__function   = getattr(self,f'_SphereOperator__{name}')
         
         self.__radius = radius
+        
+        self.__dtype = dtype
             
     def __call__(self,ds):
         return Operator(*self.__function(ds))
@@ -111,6 +113,10 @@ class SphereOperator():
     @property
     def radius(self):
         return self.__radius
+        
+    @property
+    def dtype(self):
+        return self.__dtype
     
     def __D(self,ds):
         
@@ -118,7 +124,7 @@ class SphereOperator():
             
             n,a,b,dn,da,db = spin2Jacobi(Lmax,m,s,ds=ds)
             
-            D = Jacobi.operator('C' if da+db == 0 else 'D')(da)
+            D = Jacobi.operator('C' if da+db == 0 else 'D',dtype=self.dtype)(da)
             
             return  (-ds*np.sqrt(0.5)/self.radius)*D(n,a,b)
     
@@ -130,8 +136,9 @@ class SphereOperator():
 
             n,a,b,dn,da,db = spin2Jacobi(Lmax,m,s,ds=ds)
             
-            S = Jacobi.operator('A')(da) @ Jacobi.operator('B')(db)
-
+            S =     Jacobi.operator('A',dtype=self.dtype)(da)
+            S = S @ Jacobi.operator('B',dtype=self.dtype)(db)
+            
             return (da*ds) * S(n,a,b)
 
         return Sin, SphereCodomain(1,0,ds,0)
@@ -150,7 +157,7 @@ class SphereOperator():
     def parity(dtype=dtype):
         
         def Pi(Lmax,m,s):
-            return Jacobi.operator('Pi')(*spin2Jacobi(Lmax,m,s))
+            return Jacobi.operator('Pi',dtype=dtype)(*spin2Jacobi(Lmax,m,s))
             
         return Operator(Pi,SphereCodomain(0,0,0,1))
     
@@ -194,7 +201,7 @@ class SphereCodomain(JacobiCodomain):
         s = f'(L->L+{self[0]},m->m+{self[1]},s->s+{self[2]})'
         if self[3]: s = s.replace('s->s','s->-s')
         return s.replace('+0','').replace('+-','-')
-        
+    
     def __call__(self,*args,evaluate=True):
         L,m,s = args[:3]
         if self[3]: s *= -1
