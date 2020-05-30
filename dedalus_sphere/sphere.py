@@ -1,8 +1,7 @@
 import numpy             as np
-import jacobi            as Jacobi
-from jacobi              import JacobiCodomain
+import dedalus_sphere.jacobi            as Jacobi
 from scipy.sparse import dia_matrix as banded
-from operators    import Operator, infinite_csr
+from dedalus_sphere.operators    import Operator, infinite_csr
 
 dtype = 'float128'
 
@@ -192,10 +191,10 @@ class SphereOperator():
         return Operator(S,SphereCodomain(0,0,0,0))
     
 
-class SphereCodomain(JacobiCodomain):
+class SphereCodomain(Jacobi.JacobiCodomain):
     
     def __init__(self,dL=0,dm=0,ds=0,pi=0):
-        JacobiCodomain.__init__(self,*(dL,dm,ds,pi),Output=SphereCodomain)
+        Jacobi.JacobiCodomain.__init__(self,*(dL,dm,ds,pi),Output=SphereCodomain)
         
     def __str__(self):
         s = f'(L->L+{self[0]},m->m+{self[1]},s->s+{self[2]})'

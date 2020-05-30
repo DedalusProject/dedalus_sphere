@@ -1,7 +1,7 @@
 import numpy             as np
 from scipy.sparse import dia_matrix as banded
 
-from operators import Operator, Codomain, infinite_csr
+from dedalus_sphere.operators import Operator, Codomain, infinite_csr
 
 dtype='float64'
 

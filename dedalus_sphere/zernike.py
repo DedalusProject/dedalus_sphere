@@ -1,7 +1,6 @@
 import numpy as np
-import jacobi  as Jacobi
-from  jacobi import JacobiCodomain
-from operators    import Operator, infinite_csr
+import dedalus_sphere.jacobi  as Jacobi
+from dedalus_sphere.operators    import Operator, infinite_csr
 
 
 # The defalut configuration for the base Jacobi parameter.
@@ -103,10 +102,10 @@ class ZernikeOperator():
         return R, ZernikeCodomain((1-dl)//2,0,dl)
     
     
-class ZernikeCodomain(JacobiCodomain):
+class ZernikeCodomain(Jacobi.JacobiCodomain):
 
     def __init__(self,dn=0,dk=0,dl=0,pi=0):
-        JacobiCodomain.__init__(self,dn,dk,dl,0,Output=ZernikeCodomain)
+        Jacobi.JacobiCodomain.__init__(self,dn,dk,dl,0,Output=ZernikeCodomain)
     
     def __str__(self):
         s = f'(n->n+{self[0]},k->k+{self[1]},l->l+{self[2]})'
