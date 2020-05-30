@@ -450,6 +450,9 @@ class JacobiCodomain(Codomain):
         if Output == None: Output = JacobiCodomain
         Codomain.__init__(self,*(dn,da,db,pi),Output=Output)
     
+    def __len__(self):
+        return 3
+    
     def __str__(self):
         s = f'(n->n+{self[0]},a->a+{self[1]},b->b+{self[2]})'
         if self[3]: s = s.replace('a->a','a->b').replace('b->b','b->a')

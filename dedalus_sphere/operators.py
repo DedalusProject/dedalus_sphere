@@ -123,23 +123,32 @@ class Operator():
     def __add__(self,other):
     
         if other == 0: return self
+        
         if not isinstance(other,Operator):
             other = other*self.identity
             
         codomain = self.codomain | other.codomain
-        output   = self if codomain is self.codomain else other
-           
+        
         def function(*args):
             return self(*args) + other(*args)
             
-        return output.Output(function, codomain)
+        return self.Output(function, codomain)
     
     def __mul__(self,other):
         if isinstance(other,Operator):
             return self @ other - other @ self
+            
         def function(*args):
             return other*self(*args)
         return self.Output(function,self.codomain)
+        
+     #   def function(*args):
+     #       a,b = args[:len(self.codomain)], args[len(self.codomain):]
+     #       return Kronecker(self(*a),other(*b))
+     #   codomain = Codomain(self.codomain,other.codomain)
+     #   return Operator(function,codomain)
+    
+    
     
     def __radd__(self,other):
         return self + other
@@ -178,7 +187,7 @@ class Codomain():
     """
 
     def __init__(self,*arrow,Output=None):
-        if Output == None: Output = Operator
+        if Output == None: Output = Codomain
         
         self.__arrow  = arrow
         self.__Output = Output
@@ -193,7 +202,10 @@ class Codomain():
     
     def __getitem__(self,item):
         return self.__arrow[(item)]
-        
+    
+    def __len__(self):
+        return len(self[:])
+    
     def __str__(self):
         return str(self.arrow)
     
@@ -201,7 +213,7 @@ class Codomain():
         return str(self)
         
     def __add__(self,other):
-        return self.Output(*self(*other.arrow))
+        return self.Output(*tuple(a+b for a,b in zip(self[:],other[:])))
     
     def __call__(self,*args):
         return tuple(a+b for a,b in zip(self.arrow,args))
@@ -212,7 +224,7 @@ class Codomain():
     def __or__(self,other):
         if self != other:
             raise TypeError('operators have incompatible codomains.')
-        return self
+        return self.Output(*tuple(a|b for a,b in zip(self[:],other[:])))
     
     def __neg__(self):
         return self.Output(*tuple(-a for a in self.arrow))

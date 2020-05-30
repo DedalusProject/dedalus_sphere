@@ -53,8 +53,7 @@ class TensorOperator(Operator):
     
     def __call__(self,*args):
         output = self.function(*args)
-        tiny = np.where(np.abs(output) < self.threshold)
-        output[tiny] = 0
+        np.where(np.abs(output) < self.threshold,0,output)
         return output
     
     @int2tuple
@@ -372,5 +371,5 @@ class TensorCodomain(Codomain):
         Codomain.__init__(self,rank_change,Output=TensorCodomain)
         
     def __str__(self):
-        s = f'(rank->rank+{self.arrow})'
+        s = f'(rank->rank+{self[0]})'
         return s.replace('+0','').replace('+-','-')
