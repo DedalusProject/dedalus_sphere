@@ -294,7 +294,7 @@ class infinite_csr(csr_matrix):
     
     @property
     def square(self):
-        return self[:self.shape[1]]
+        return csr_matrix(self[:self.shape[1]])
     
     def __getitem__(self,item):
    
