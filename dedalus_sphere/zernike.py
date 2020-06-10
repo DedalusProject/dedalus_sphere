@@ -51,7 +51,7 @@ def operator(dimension, name, radius=1):
     if name == 'Id':
         def I(n,k,l):
             return Jacobi.operator('Id')(n,k,l+dimension/2 - 1)
-        return Operator(I,ZernikeCodomain(1,0,0))
+        return Operator(I,ZernikeCodomain(0,0,0))
     
     if name == 'Z':
         def Z(n,k,l):
