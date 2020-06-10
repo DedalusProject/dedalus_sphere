@@ -328,7 +328,7 @@ class Intertwiner(TensorOperator):
     
         spin, regularity = i[0], i[1]
         
-        if spin == ():
+        if len(spin) == 0:
             return 1
 
         if self.forbidden_spin(spin) or self.forbidden_regularity(regularity):
