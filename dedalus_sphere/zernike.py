@@ -48,6 +48,11 @@ def operator(dimension,name):
 
     """
     
+    if name == 'Id':
+        def I(n,k,l):
+            return Jacobi.operator('Id')(n,k,l+dimension/2 - 1)
+        return Operator(I,ZernikeCodomain(1,0,0))
+    
     if name == 'Z':
         def Z(n,k,l):
             return Jacobi.operator('Z')(n,k,l+dimension/2 - 1)
