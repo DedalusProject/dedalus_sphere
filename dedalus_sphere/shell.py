@@ -19,6 +19,11 @@ def operator(dimension,radii,name,alpha=alpha):
     
     Z = (radii[1] + radii[0])/width + Jacobi.operator('Z')
     
+    if name == 'Id':
+        def I(n,k):
+            return Jacobi.operator('Id')(n,k+alpha[0],k+alpha[1])
+        return Operator(I,ShellCodomain(0,0))
+    
     if name == 'R':
         def R(n,k):
             return (0.5*width)*Z(n,k+alpha[0],k+alpha[1])
