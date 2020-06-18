@@ -39,7 +39,7 @@ def polynomials(dimension,n,k,l,z):
     return Jacobi.polynomials(n,k,b,z,init)
 
 
-def operator(dimension,name,radius=1):
+def operator(dimension, name, radius=1):
     """
     Interface to base ZernikeOperator class.
 
@@ -58,7 +58,7 @@ def operator(dimension,name,radius=1):
             return Jacobi.operator('Z')(n,k,l+dimension/2 - 1)
         return Operator(Z,ZernikeCodomain(1,0,0))
         
-    return ZernikeOperator(dimension,name,radius=radius)
+    return ZernikeOperator(dimension, name, radius=radius)
 
 class ZernikeOperator():
     
