@@ -7,7 +7,7 @@ from dedalus_sphere.operators    import Operator, infinite_csr
 alpha = 0
 
 def mass(dimension,k=alpha):
-    return Jacobi.mass(k,dimension/2 - 1)*2**( k + dimension/2 + 1 )
+    return Jacobi.mass(k,dimension/2 - 1)/2**( k + dimension/2 + 1 )
 
 def quadrature(dimension,n,k=alpha):
     """
