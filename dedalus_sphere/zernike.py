@@ -6,6 +6,9 @@ from dedalus_sphere.operators    import Operator, infinite_csr
 # The defalut configuration for the base Jacobi parameter.
 alpha = 0
 
+def mass(dimension,k=alpha):
+    return Jacobi.mass(k,dimension/2 - 1)*2**( k + dimension/2 + 1 )
+
 def quadrature(dimension,n,k=alpha):
     """
     Weights associated with
