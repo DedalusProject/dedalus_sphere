@@ -128,7 +128,7 @@ def grid_guess(n,a,b,dtype='float128',quick=False):
     
     Z = banded(operator('Z')(n,a,b))
     
-    return eigs(Z.diagonal(0),Z.diagonal(1))
+    return eigs(Z.diagonal(0),Z.diagonal(1)).astype(dtype)
  
  
 def measure(a,b,z,probability=True,log=False):
