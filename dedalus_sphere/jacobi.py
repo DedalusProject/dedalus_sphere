@@ -91,14 +91,22 @@ def quadrature(n,a,b,days=3,probability=False,dtype=dtype,internal='float128'):
     
     return z.astype(dtype), w.astype(dtype)
 
-def grid_guess(n,a,b,dtype='float128'):
+def grid_guess(n,a,b,dtype='float128',quick=False):
     """
     Approximate solution to
     
     P(n,a,b,z) = 0
     
     """
-    return np.cos(np.pi*(np.arange(4*n-1,2,-4,dtype=dtype)+2*a)/(4*n+2*(a+b+1)))
+    
+    if quick:
+        return np.cos(np.pi*(np.arange(4*n-1,2,-4,dtype=dtype)+2*a)/(4*n+2*(a+b+1)))
+        
+    from scipy.linalg import eigvalsh_tridiagonal as eigs
+    
+    Z = banded(operator('Z')(n,a,b))
+    
+    return eigs(Z.diagonal(0),Z.diagonal(1))
  
  
 def measure(a,b,z,probability=True,log=False):
