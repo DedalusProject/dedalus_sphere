@@ -5,6 +5,28 @@ from dedalus_sphere.operators import Operator, Codomain, infinite_csr
 
 dtype='float64'
 
+def coefficient_connection(N,ab,cd,init_ab=1,init_cd=1):
+    """The connection matrix between any bases coefficients:
+        Pab(z) = Pcd(z) @ Cab2cd    -->    Acd = Cab2cd @ Aab
+        The output is always a dense matrix format.
+        Parameters
+        ----------
+        N      :  int
+        ab, cd :  tuples of input and output Jacobi parameters.
+        """
+
+    a,b = ab
+    c,d = cd
+
+    zcd, wcd = quadrature(N,c,d)
+
+    wcd /= np.sum(wcd)
+
+    Pab = polynomials(N,a,b,zcd,init_ab + 0*zcd)
+    Pcd = polynomials(N,c,d,zcd,init_cd + 0*zcd)
+
+    return Pcd @ (wcd*Pab).T
+
 def polynomials(n,a,b,z,init=None,Newton=False,normalised=True,dtype=dtype,internal='float128'):
     """
     Jacobi polynomials, P(n,a,b,z), of type (a,b) up to degree n-1.
