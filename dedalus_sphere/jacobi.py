@@ -126,6 +126,9 @@ def grid_guess(n,a,b,dtype='float128',quick=False):
         
     from scipy.linalg import eigvalsh_tridiagonal as eigs
     
+    if n == 1:
+        return operator('Z')(n,a,b).A[0]
+    
     Z = banded(operator('Z')(n,a,b))
     
     return eigs(Z.diagonal(0),Z.diagonal(1)).astype(dtype)
