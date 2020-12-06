@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import product
-from dedalus_sphere.tuple_tools import *
-from dedalus_sphere.operators import Operator, Codomain
+from .tuple_tools import *
+from .operators import Operator, Codomain
 
 indexing  = (-1,0,1)
 threshold = 1e-12

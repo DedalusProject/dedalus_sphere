@@ -1,7 +1,7 @@
 import numpy             as np
-import dedalus_sphere.jacobi            as Jacobi
+from . import jacobi            as Jacobi
 from scipy.sparse import dia_matrix as banded
-from dedalus_sphere.operators    import Operator, infinite_csr
+from .operators    import Operator, infinite_csr
 
 dtype = 'longdouble'
 

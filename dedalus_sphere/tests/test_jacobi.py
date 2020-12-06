@@ -3,7 +3,7 @@
 
 import pytest
 import numpy as np
-from dedalus_sphere import jacobi128
+from . import jacobi128
 
 
 N_range = [1, 2, 3, 4, 8, 16]

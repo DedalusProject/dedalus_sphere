@@ -1,6 +1,6 @@
 import numpy as np
-import dedalus_sphere.jacobi  as Jacobi
-from dedalus_sphere.operators    import Operator, infinite_csr
+from . import jacobi  as Jacobi
+from .operators    import Operator, infinite_csr
 
 
 # The defalut configuration for the base Jacobi parameter.
