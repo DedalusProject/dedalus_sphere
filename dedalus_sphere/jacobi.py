@@ -27,7 +27,7 @@ def coefficient_connection(N,ab,cd,init_ab=1,init_cd=1):
 
     return Pcd @ (wcd*Pab).T
 
-def polynomials(n,a,b,z,init=None,Newton=False,normalised=True,dtype=dtype,internal='float128'):
+def polynomials(n,a,b,z,init=None,Newton=False,normalised=True,dtype=dtype,internal='longdouble'):
     """
     Jacobi polynomials, P(n,a,b,z), of type (a,b) up to degree n-1.
     
@@ -42,7 +42,7 @@ def polynomials(n,a,b,z,init=None,Newton=False,normalised=True,dtype=dtype,inter
     
     init: float, np.ndarray or None -> 1+0*z, or (1+0*z)/sqrt(mass) if normalised.
     normalised: classical or unit-integral normalisation.
-    dtype:   'float64','float128' output dtype.
+    dtype:   'float64','longdouble' output dtype.
     internal: internal dtype.
     
     """
@@ -77,7 +77,7 @@ def polynomials(n,a,b,z,init=None,Newton=False,normalised=True,dtype=dtype,inter
 
     return P[:n].astype(dtype)
 
-def quadrature(n,a,b,days=3,probability=False,dtype=dtype,internal='float128'):
+def quadrature(n,a,b,days=3,probability=False,dtype=dtype,internal='longdouble'):
     """
     Jacobi 'roots' grid and weights; solutions to
     
@@ -92,7 +92,7 @@ def quadrature(n,a,b,days=3,probability=False,dtype=dtype,internal='float128'):
     a,b: float > -1.
     days: number of Newton updates.
     probability: sum(weights) = 1 or sum(weights) = mass(a,b)
-    dtype:   'float64','float128' output dtype.
+    dtype:   'float64','longdouble' output dtype.
     internal: internal dtype (Newton uses by default).
     
     """
@@ -113,7 +113,7 @@ def quadrature(n,a,b,days=3,probability=False,dtype=dtype,internal='float128'):
     
     return z.astype(dtype), w.astype(dtype)
 
-def grid_guess(n,a,b,dtype='float128',quick=False):
+def grid_guess(n,a,b,dtype='longdouble',quick=False):
     """
     Approximate solution to
     
@@ -323,7 +323,7 @@ class JacobiOperator():
         A, B, C, D
     normalised: bool
         True gives operators on unit-integral polynomials, False on classical normalisation.
-    dtype: 'float64','float128'
+    dtype: 'float64','longdouble'
         output dtype.
     
     
@@ -342,7 +342,7 @@ class JacobiOperator():
     
     """
     
-    dtype='float128'
+    dtype='longdouble'
     
     def __init__(self,name,normalised=True,dtype=dtype):
         

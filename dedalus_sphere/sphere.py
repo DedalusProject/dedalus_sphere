@@ -3,7 +3,7 @@ import dedalus_sphere.jacobi            as Jacobi
 from scipy.sparse import dia_matrix as banded
 from dedalus_sphere.operators    import Operator, infinite_csr
 
-dtype = 'float128'
+dtype = 'longdouble'
 
 def quadrature(Lmax,dtype=dtype):
     """Generates the Gauss quadrature grid and weights for spherical harmonics transform.
@@ -53,7 +53,7 @@ def harmonics(Lmax,m,s,cos_theta,**kwargs):
         m,s : int
             spherical harmonic parameters.
         cos_theta: np.ndarray or float.
-        dtype: output dtype. internal dtype = 'float128'.
+        dtype: output dtype. internal dtype = 'longdouble'.
         """
     
     n,a,b = spin2Jacobi(Lmax,m,s)
